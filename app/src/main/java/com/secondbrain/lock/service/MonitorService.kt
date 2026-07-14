@@ -15,6 +15,7 @@ import com.secondbrain.lock.data.AppLimit
 import com.secondbrain.lock.data.AppLimitRepository
 import com.secondbrain.lock.data.UsageStatsHelper
 import com.secondbrain.lock.util.Permissions
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -43,7 +44,7 @@ class MonitorService : LifecycleService() {
 
     private suspend fun pollLoop() {
         var lookbackStart = System.currentTimeMillis() - POLL_INTERVAL_MS
-        while (isActive) {
+        while (coroutineContext.isActive) {
             if (Permissions.hasUsageAccess(applicationContext)) {
                 runCatching { tick(lookbackStart) }
             }
