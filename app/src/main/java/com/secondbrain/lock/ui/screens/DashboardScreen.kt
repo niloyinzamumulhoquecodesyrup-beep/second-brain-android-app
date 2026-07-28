@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,9 +17,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -50,12 +55,25 @@ data class DashboardRow(
 fun DashboardScreen(
     rows: List<DashboardRow>,
     onAdd: () -> Unit,
-    onRemove: (AppLimit) -> Unit
+    onRemove: (AppLimit) -> Unit,
+    onToggleSchedule: (AppLimit, Boolean) -> Unit,
+    onToggleFocus: (AppLimit, Boolean) -> Unit,
+    onOpenSettings: () -> Unit,
+    contentPadding: PaddingValues = PaddingValues()
 ) {
     Scaffold(
         containerColor = Ink950,
         floatingActionButton = {
-            FloatingActionButton(onClick = onAdd, containerColor = Emerald400, contentColor = Ink950) {
+            // Shield's content fills the full window behind the glass top/bottom bars (same as
+            // every other tab, for the haze blur to work), so this FAB — anchored by Scaffold to
+            // the bottom of that full area — was ending up underneath the bottom nav bar instead
+            // of floating above it. Lift it clear by the same amount the bar actually occupies.
+            FloatingActionButton(
+                onClick = onAdd,
+                containerColor = Emerald400,
+                contentColor = Ink950,
+                modifier = Modifier.padding(bottom = contentPadding.calculateBottomPadding())
+            ) {
                 Icon(Icons.Filled.Add, contentDescription = "Add app limit")
             }
         }
@@ -64,9 +82,23 @@ fun DashboardScreen(
             modifier = Modifier
                 .fullAuraBackground()
                 .padding(padding)
-                .padding(horizontal = 20.dp, vertical = 28.dp)
+                .padding(
+                    start = 20.dp,
+                    end = 20.dp,
+                    top = contentPadding.calculateTopPadding() + 28.dp,
+                    bottom = 28.dp
+                )
         ) {
-            SbLabel("Overview")
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                SbLabel("Overview")
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Mist400)
+                }
+            }
             Spacer(Modifier.height(8.dp))
             GradientText("Your limits", fontSize = 40.sp)
             Spacer(Modifier.height(4.dp))
@@ -91,7 +123,12 @@ fun DashboardScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(rows, key = { it.limit.packageName }) { row ->
-                        AppLimitCard(row, onRemove = { onRemove(row.limit) })
+                        AppLimitCard(
+                            row,
+                            onRemove = { onRemove(row.limit) },
+                            onToggleSchedule = { onToggleSchedule(row.limit, it) },
+                            onToggleFocus = { onToggleFocus(row.limit, it) }
+                        )
                     }
                     item { Spacer(Modifier.height(72.dp)) }
                 }
@@ -101,7 +138,12 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun AppLimitCard(row: DashboardRow, onRemove: () -> Unit) {
+private fun AppLimitCard(
+    row: DashboardRow,
+    onRemove: () -> Unit,
+    onToggleSchedule: (Boolean) -> Unit,
+    onToggleFocus: (Boolean) -> Unit
+) {
     val limitMillis = row.limit.dailyLimitMinutes * 60_000L
     val fraction = (row.usedMillis.toFloat() / limitMillis.toFloat()).coerceIn(0f, 1f)
     val locked = row.usedMillis >= limitMillis
@@ -125,6 +167,13 @@ private fun AppLimitCard(row: DashboardRow, onRemove: () -> Unit) {
                     style = SecondBrainTypography.bodySmall,
                     color = if (locked) Rose400 else Mist300
                 )
+                row.limit.openCountLimit?.let {
+                    Text(
+                        "Capped at $it opens/day",
+                        style = SecondBrainTypography.bodySmall,
+                        color = Mist400
+                    )
+                }
             }
             Text(
                 "×",
@@ -149,5 +198,26 @@ private fun AppLimitCard(row: DashboardRow, onRemove: () -> Unit) {
                     .background(accent)
             )
         }
+        Spacer(Modifier.height(14.dp))
+        ToggleRow("Block during schedule windows", row.limit.blockDuringSchedule, onToggleSchedule)
+        Spacer(Modifier.height(6.dp))
+        ToggleRow("Block during focus sessions", row.limit.blockDuringFocus, onToggleFocus)
+    }
+}
+
+@Composable
+private fun ToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = SecondBrainTypography.bodySmall, color = Mist300, modifier = Modifier.weight(1f))
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(checkedTrackColor = Emerald400, checkedThumbColor = Ink950),
+            modifier = Modifier.height(24.dp)
+        )
     }
 }

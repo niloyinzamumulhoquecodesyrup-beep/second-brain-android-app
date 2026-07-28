@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The app never overrode the stock platform theme's accent, so every native-rendered
+         effect Compose doesn't fully own (ripple/press-state fallback, list overscroll glow)
+         rendered in Android's default Material blue instead of the app's teal brand color —
+         visible as a stray blue glow on presses like the Shield tab. -->
+    <style name="Theme.ShoreUp" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">#5EEAD4</item>
+        <item name="android:colorAccent">#5EEAD4</item>
+        <item name="android:colorControlActivated">#5EEAD4</item>
+        <item name="android:colorControlHighlight">#5EEAD4</item>
+        <item name="android:colorControlNormal">#5EEAD4</item>
+        <item name="android:windowBackground">#050607</item>
+    </style>
+</resources>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.secondbrain.lock.service.BlockingOverlayRoot xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#050607"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:clickable="true"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:padding="32dp">
+
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/overlay_lock_ring"
+        android:layout_marginBottom="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="&#127860;"
+            android:textSize="26sp" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/cooldownLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="TAKING A MOMENT"
+        android:textColor="#5EEAD4"
+        android:textSize="11sp"
+        android:letterSpacing="0.2"
+        android:layout_marginBottom="14dp" />
+
+    <TextView
+        android:id="@+id/cooldownAppName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFF"
+        android:textSize="26sp"
+        android:fontFamily="serif"
+        android:gravity="center"
+        android:text="App" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#8A929B"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:layout_marginTop="10dp"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:text="Why did you open this?" />
+
+    <LinearLayout
+        android:id="@+id/cooldownChipRow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="18dp" />
+
+    <LinearLayout
+        android:id="@+id/cooldownChipRow2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="10dp" />
+
+    <TextView
+        android:id="@+id/cooldownCountdown"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#6A717A"
+        android:textSize="13sp"
+        android:layout_marginTop="32dp"
+        android:text="Continuing in 5..." />
+
+</com.secondbrain.lock.service.BlockingOverlayRoot>

@@ -7,6 +7,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -16,21 +23,44 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.navigation.compose.rememberNavController
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.hazeChild
 import com.secondbrain.lock.data.AppLimit
 import com.secondbrain.lock.data.AppLimitRepository
 import com.secondbrain.lock.data.InstalledAppInfo
 import com.secondbrain.lock.data.InstalledAppsRepository
+import com.secondbrain.lock.data.SchedulePrefs
+import com.secondbrain.lock.data.SecurePrefs
+import com.secondbrain.lock.data.SleepPrefs
+import com.secondbrain.lock.data.repo.ProfileRepository
+import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.service.MonitorService
+import com.secondbrain.lock.ui.nav.AppNavHost
+import com.secondbrain.lock.ui.nav.BottomBar
+import com.secondbrain.lock.ui.nav.Destination
+import com.secondbrain.lock.ui.nav.TopBar
 import com.secondbrain.lock.ui.screens.AddAppScreen
 import com.secondbrain.lock.ui.screens.DashboardRow
 import com.secondbrain.lock.ui.screens.DashboardScreen
+import com.secondbrain.lock.ui.screens.LoginScreen
 import com.secondbrain.lock.ui.screens.OnboardingScreen
 import com.secondbrain.lock.ui.screens.PermissionStep
+import com.secondbrain.lock.ui.screens.SettingsScreen
+import com.secondbrain.lock.ui.theme.Ink900
 import com.secondbrain.lock.ui.theme.SecondBrainLockTheme
+import com.secondbrain.lock.ui.theme.Violet600
+import com.secondbrain.lock.ui.wake.WakeFlowActivity
 import com.secondbrain.lock.util.Permissions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -49,64 +79,181 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { DASHBOARD, ADD_APP }
+private enum class SettingsTab { DASHBOARD, ADD_APP, SETTINGS }
 
 @Composable
 private fun RootApp() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var authToken by remember { mutableStateOf(SecurePrefs.getToken(context)) }
+    var loginLoading by remember { mutableStateOf(false) }
+    var loginError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        ApiClient.onUnauthorized.collect { authToken = null }
+    }
+
+    if (authToken == null) {
+        LoginScreen(
+            isLoading = loginLoading,
+            errorMessage = loginError,
+            onLogin = { email, password ->
+                loginError = null
+                loginLoading = true
+                scope.launch {
+                    val result = ApiClient.login(email, password)
+                    loginLoading = false
+                    result.onSuccess { token -> authToken = token }
+                    result.onFailure { error -> loginError = error.message ?: "Login failed" }
+                }
+            }
+        )
+        return
+    }
+
+    val navController = rememberNavController()
+    val hazeState = remember { HazeState() }
+    val glassStyle = HazeStyle(
+        backgroundColor = Ink900,
+        tints = listOf(HazeTint(Violet600.copy(alpha = 0.32f))),
+        blurRadius = 20.dp
+    )
+
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopBar(
+                    onOpenSettings = { navController.navigate(Destination.SHIELD.route) },
+                    onLogout = {
+                        ApiClient.logout()
+                        ProfileRepository.clear()
+                        authToken = null
+                    },
+                    modifier = Modifier.hazeChild(state = hazeState, style = glassStyle)
+                )
+            },
+            bottomBar = {
+                BottomBar(
+                    navController,
+                    modifier = Modifier.hazeChild(state = hazeState, style = glassStyle)
+                )
+            }
+        ) { padding ->
+            // Deliberately NOT wrapped in Modifier.padding(padding): the whole point of the glass
+            // bars is that real scrolled content passes underneath and blurs through them, so this
+            // has to draw full-bleed and BE the haze source. `padding` (the bar heights Scaffold
+            // just measured) is instead threaded down as contentPadding so each screen's own
+            // scrollable column keeps its resting content clear of the bars.
+            AppNavHost(
+                navController = navController,
+                shieldContent = { shieldPadding -> SettingsFlow(shieldPadding) },
+                modifier = Modifier.fillMaxSize().haze(state = hazeState),
+                contentPadding = padding
+            )
+        }
+    }
+}
+
+/** The native onboarding + app-limit dashboard flow, now living under the Shield tab. */
+@Composable
+private fun SettingsFlow(contentPadding: PaddingValues = PaddingValues()) {
     val context = LocalContext.current
     val repo = remember { AppLimitRepository(context) }
     val scope = rememberCoroutineScope()
 
     var permissionsGranted by remember { mutableStateOf(Permissions.allGranted(context)) }
-    var screen by remember { mutableStateOf(Screen.DASHBOARD) }
+    // Onboarding stays on screen — showing live checkmarks — until the user explicitly taps
+    // Continue, rather than vanishing the instant the last permission is granted in the
+    // background (which used to happen on the very next ON_RESUME, before the user ever saw
+    // the final checked state).
+    var onboardingActive by remember { mutableStateOf(!permissionsGranted) }
+    var screen by remember { mutableStateOf(SettingsTab.DASHBOARD) }
+    // Bumped on every resume so the `steps` list below (a plain val, not its own observable
+    // state) is forced to recompute with fresh granted/not-granted flags even when the
+    // overall permissionsGranted boolean hasn't flipped yet (e.g. only 1 of 3 granted so far).
+    var resumeTick by remember { mutableStateOf(0) }
 
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { permissionsGranted = Permissions.allGranted(context) }
+    ) { resumeTick++; permissionsGranted = Permissions.allGranted(context) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                val granted = Permissions.allGranted(context)
-                permissionsGranted = granted
-                if (granted) MonitorService.start(context)
+                resumeTick++
+                permissionsGranted = Permissions.allGranted(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    if (!permissionsGranted) {
-        val steps = listOf(
-            PermissionStep(
-                title = "Usage access",
-                description = "Lets the app see which app is open right now and how long you've used it today.",
-                granted = Permissions.hasUsageAccess(context),
-                onRequest = { context.startActivity(Permissions.usageAccessIntent(context)) }
-            ),
-            PermissionStep(
-                title = "Display over other apps",
-                description = "Needed to show the hard-lock screen on top of an app once its time is up.",
-                granted = Permissions.hasOverlay(context),
-                onRequest = { context.startActivity(Permissions.overlayIntent(context)) }
-            ),
-            PermissionStep(
-                title = "Notifications",
-                description = "So you get a heads-up before an app locks, not just after.",
-                granted = Permissions.hasNotifications(context),
-                onRequest = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    if (onboardingActive) {
+        var showAccessibilityRationale by remember { mutableStateOf(false) }
+        val steps = remember(resumeTick) {
+            listOf(
+                PermissionStep(
+                    title = "Usage access",
+                    description = "Lets the app see which app is open right now and how long you've used it today.",
+                    granted = Permissions.hasUsageAccess(context),
+                    onRequest = { context.startActivity(Permissions.usageAccessIntent(context)) }
+                ),
+                PermissionStep(
+                    title = "Display over other apps",
+                    description = "Needed to show the hard-lock screen on top of an app once its time is up.",
+                    granted = Permissions.hasOverlay(context),
+                    onRequest = { context.startActivity(Permissions.overlayIntent(context)) }
+                ),
+                PermissionStep(
+                    title = "Notifications",
+                    description = "So you get a heads-up before an app locks, not just after.",
+                    granted = Permissions.hasNotifications(context),
+                    onRequest = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
                     }
+                ),
+                PermissionStep(
+                    title = "Instant blocking",
+                    description = "Without this, the app still blocks apps, just by checking every second or two instead of instantly. It only reads which app is in front — never screen content or what you tap.",
+                    granted = Permissions.hasAccessibility(context),
+                    onRequest = { showAccessibilityRationale = true },
+                    optional = true
+                )
+            )
+        }
+        if (showAccessibilityRationale) {
+            AlertDialog(
+                onDismissRequest = { showAccessibilityRationale = false },
+                title = { Text("Turn on instant blocking?") },
+                text = {
+                    Text(
+                        "This opens Android's Accessibility settings and asks you to enable Slay Task there. " +
+                            "It only ever reads which app is currently in the foreground, to lock it the moment it opens " +
+                            "instead of within a second or two. It cannot read screen content, typed text, or taps. " +
+                            "You can turn it off again at any time in Accessibility settings."
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showAccessibilityRationale = false
+                        context.startActivity(Permissions.accessibilityIntent())
+                    }) { Text("Open settings") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAccessibilityRationale = false }) { Text("Not now") }
                 }
             )
-        )
+        }
         OnboardingScreen(
             steps = steps,
-            allGranted = steps.all { it.granted },
+            allGranted = steps.filter { !it.optional }.all { it.granted },
             onContinue = {
-                permissionsGranted = true
+                onboardingActive = false
                 MonitorService.start(context)
             }
         )
@@ -114,7 +261,7 @@ private fun RootApp() {
     }
 
     when (screen) {
-        Screen.DASHBOARD -> {
+        SettingsTab.DASHBOARD -> {
             val limits by repo.observeAll().collectAsState(initial = emptyList())
             var rows by remember { mutableStateOf<List<DashboardRow>>(emptyList()) }
 
@@ -129,12 +276,20 @@ private fun RootApp() {
 
             DashboardScreen(
                 rows = rows,
-                onAdd = { screen = Screen.ADD_APP },
-                onRemove = { limit: AppLimit -> scope.launch(Dispatchers.IO) { repo.remove(limit) } }
+                onAdd = { screen = SettingsTab.ADD_APP },
+                onRemove = { limit: AppLimit -> scope.launch(Dispatchers.IO) { repo.remove(limit) } },
+                onToggleSchedule = { limit, enabled ->
+                    scope.launch(Dispatchers.IO) { repo.setBlockDuringSchedule(limit, enabled) }
+                },
+                onToggleFocus = { limit, enabled ->
+                    scope.launch(Dispatchers.IO) { repo.setBlockDuringFocus(limit, enabled) }
+                },
+                onOpenSettings = { screen = SettingsTab.SETTINGS },
+                contentPadding = contentPadding
             )
         }
 
-        Screen.ADD_APP -> {
+        SettingsTab.ADD_APP -> {
             var apps by remember { mutableStateOf<List<InstalledAppInfo>>(emptyList()) }
             LaunchedEffect(Unit) {
                 apps = withContext(Dispatchers.IO) {
@@ -143,10 +298,56 @@ private fun RootApp() {
             }
             AddAppScreen(
                 apps = apps,
-                onBack = { screen = Screen.DASHBOARD },
-                onConfirm = { app: InstalledAppInfo, minutes: Int ->
-                    scope.launch(Dispatchers.IO) { repo.add(app.packageName, app.label, minutes) }
-                    screen = Screen.DASHBOARD
+                onBack = { screen = SettingsTab.DASHBOARD },
+                onConfirm = { app: InstalledAppInfo, minutes: Int, openCountLimit: Int? ->
+                    scope.launch(Dispatchers.IO) { repo.add(app.packageName, app.label, minutes, openCountLimit) }
+                    screen = SettingsTab.DASHBOARD
+                }
+            )
+        }
+
+        SettingsTab.SETTINGS -> {
+            var settingsResumeTick by remember { mutableStateOf(0) }
+            DisposableEffect(lifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) settingsResumeTick++
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            }
+            var autoBlockCategories by remember(settingsResumeTick) {
+                mutableStateOf(SchedulePrefs.getAutoBlockCategories(context))
+            }
+            var sleepAlarmEnabled by remember { mutableStateOf(SleepPrefs.isEnabled(context)) }
+            var useRoutineSleepWindow by remember { mutableStateOf(SleepPrefs.getUseRoutineSleepWindow(context)) }
+            var wakeMinuteOfDay by remember { mutableStateOf(SleepPrefs.getWakeMinuteOfDay(context)) }
+
+            SettingsScreen(
+                onBack = { screen = SettingsTab.DASHBOARD },
+                autoBlockCategories = autoBlockCategories,
+                onToggleCategory = { category, enabled ->
+                    autoBlockCategories = if (enabled) autoBlockCategories + category else autoBlockCategories - category
+                    SchedulePrefs.setAutoBlockCategories(context, autoBlockCategories)
+                },
+                accessibilityGranted = remember(settingsResumeTick) { Permissions.hasAccessibility(context) },
+                onOpenAccessibilitySettings = { context.startActivity(Permissions.accessibilityIntent()) },
+                sleepAlarmEnabled = sleepAlarmEnabled,
+                onToggleSleepAlarm = { enabled ->
+                    sleepAlarmEnabled = enabled
+                    SleepPrefs.setEnabled(context, enabled)
+                    WakeFlowActivity.rescheduleAsync(context)
+                },
+                useRoutineSleepWindow = useRoutineSleepWindow,
+                onToggleUseRoutine = { use ->
+                    useRoutineSleepWindow = use
+                    SleepPrefs.setUseRoutineSleepWindow(context, use)
+                    WakeFlowActivity.rescheduleAsync(context)
+                },
+                wakeMinuteOfDay = wakeMinuteOfDay,
+                onWakeMinuteChange = { minute ->
+                    wakeMinuteOfDay = minute
+                    SleepPrefs.setWakeMinuteOfDay(context, minute)
+                    WakeFlowActivity.rescheduleAsync(context)
                 }
             )
         }

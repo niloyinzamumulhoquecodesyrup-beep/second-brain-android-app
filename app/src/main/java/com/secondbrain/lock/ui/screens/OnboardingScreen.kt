@@ -36,7 +36,9 @@ data class PermissionStep(
     val title: String,
     val description: String,
     val granted: Boolean,
-    val onRequest: () -> Unit
+    val onRequest: () -> Unit,
+    /** Optional steps don't gate [OnboardingScreen]'s Continue button. */
+    val optional: Boolean = false
 )
 
 @Composable
@@ -54,13 +56,13 @@ fun OnboardingScreen(
         SbLabel("Setup")
         Spacer(Modifier.height(8.dp))
         Text(
-            "Second Brain Lock",
+            "Slay Task",
             style = SecondBrainTypography.displayLarge,
             color = Color.White
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            "Three permissions let this app see when a limited app opens and hard-lock it the moment your daily time is up. Nothing is sent off-device — there's no account and no network access.",
+            "These permissions let this app see when a limited app opens and hard-lock it the moment your daily time is up. All limit tracking stays on-device — the network access this app uses is only for signing in and syncing with your second-brain account.",
             style = SecondBrainTypography.bodyMedium,
             color = Mist400
         )
@@ -81,7 +83,13 @@ fun OnboardingScreen(
                     )
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(step.title, style = SecondBrainTypography.titleMedium, color = Color.White)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(step.title, style = SecondBrainTypography.titleMedium, color = Color.White)
+                            if (step.optional) {
+                                Spacer(Modifier.width(8.dp))
+                                Text("OPTIONAL", style = SecondBrainTypography.labelSmall, color = Mist400)
+                            }
+                        }
                         Spacer(Modifier.height(4.dp))
                         Text(step.description, style = SecondBrainTypography.bodySmall, color = Mist300)
                     }

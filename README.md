@@ -1,9 +1,11 @@
-# Second Brain Lock
+# Shore Up
 
-A native Android app that does exactly one thing: lets you set a daily time
-budget for specific apps and **hard-locks** them — no skip button — once
-that budget is used up. No account, no login, no network calls; everything
-lives on-device in a local Room database.
+A full native Android client for the second-brain web app (Work/Organize/Mind/
+MINDVERSE, bottom-tab navigation, REST API + Bearer auth), plus a Shield tab
+that lets you set a daily time budget for specific apps and **hard-locks**
+them — no skip button — once that budget is used up. App-limit tracking stays
+on-device in a local Room database; everything else is synced live from the
+account you log into.
 
 Visual design is a direct port of the [second-brain](https://github.com/niloyinzamumulhoquecodesyrup-beep/second-brain)
 web app's palette and type system: near-black `ink` backgrounds, serif

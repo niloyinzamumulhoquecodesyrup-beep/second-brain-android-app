@@ -24,6 +24,7 @@ class LockOverlayManager(private val context: Context) {
     private var overlayView: View? = null
     private val handler = Handler(Looper.getMainLooper())
     private var currentLockedPackage: String? = null
+    private var countdownEnabled = true
 
     private val tickRunnable = object : Runnable {
         override fun run() {
@@ -35,12 +36,28 @@ class LockOverlayManager(private val context: Context) {
     val isShowing: Boolean get() = overlayView != null
     val lockedPackage: String? get() = currentLockedPackage
 
-    fun show(packageName: String, appName: String) {
+    /**
+     * @param label Short reason shown above the app name, e.g. "DAILY LIMIT REACHED",
+     *   "SCHEDULED BLOCK", "FOCUS SESSION".
+     * @param subtitle One-line explanation, non-punitive tone.
+     * @param showMidnightCountdown Whether the bottom panel counts down to local midnight —
+     *   true for daily-budget locks; false for schedule/focus locks, which resolve on their own
+     *   window/session ending rather than at midnight (in which case [subtitle] should say so).
+     */
+    fun show(
+        packageName: String,
+        appName: String,
+        label: String = "DAILY LIMIT REACHED",
+        subtitle: String = "You've used your time for today. This app unlocks automatically at midnight.",
+        showMidnightCountdown: Boolean = true
+    ) {
         if (currentLockedPackage == packageName && overlayView != null) return
         hide()
 
         val view = LayoutInflater.from(context).inflate(R.layout.overlay_lock, null)
+        view.findViewById<TextView>(R.id.overlayLabel).text = label
         view.findViewById<TextView>(R.id.overlayAppName).text = appName
+        view.findViewById<TextView>(R.id.overlaySubtitle).text = subtitle
         view.findViewById<TextView>(R.id.overlayHome).setOnClickListener {
             val homeIntent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_HOME)
@@ -48,6 +65,10 @@ class LockOverlayManager(private val context: Context) {
             }
             context.startActivity(homeIntent)
         }
+
+        countdownEnabled = showMidnightCountdown
+        val countdownPanel = view.findViewById<View>(R.id.overlayCountdownPanel)
+        countdownPanel.visibility = if (showMidnightCountdown) View.VISIBLE else View.GONE
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -70,7 +91,7 @@ class LockOverlayManager(private val context: Context) {
 
         overlayView = view
         currentLockedPackage = packageName
-        handler.post(tickRunnable)
+        if (showMidnightCountdown) handler.post(tickRunnable)
     }
 
     fun hide() {
@@ -83,6 +104,7 @@ class LockOverlayManager(private val context: Context) {
     }
 
     private fun updateCountdown() {
+        if (!countdownEnabled) return
         val view = overlayView ?: return
         val remaining = UsageStatsHelper.millisUntilReset()
         val hours = TimeUnit.MILLISECONDS.toHours(remaining)

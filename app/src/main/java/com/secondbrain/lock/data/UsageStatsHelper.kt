@@ -52,6 +52,37 @@ object UsageStatsHelper {
     }
 
     /**
+     * Counts how many times [packageName] has been brought to the foreground from a *different*
+     * app (or from nothing) since local midnight — i.e. distinct "opens," not every resume from
+     * screen-on/off blips within the same session. Only worth calling on an actual foreground
+     * transition (it walks the full day's event log), not on every poll tick.
+     */
+    fun todaysOpenCount(context: Context, packageName: String): Int {
+        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val events = usm.queryEvents(startOfTodayMillis(), System.currentTimeMillis())
+        var lastForeground: String? = null
+        var opens = 0
+        val event = UsageEvents.Event()
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            // ACTIVITY_RESUMED/PAUSED share the same underlying values as the deprecated
+            // MOVE_TO_FOREGROUND/BACKGROUND, so matching one covers both.
+            when (event.eventType) {
+                UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    if (event.packageName != lastForeground) {
+                        if (event.packageName == packageName) opens++
+                        lastForeground = event.packageName
+                    }
+                }
+                UsageEvents.Event.ACTIVITY_PAUSED -> {
+                    if (event.packageName == lastForeground) lastForeground = null
+                }
+            }
+        }
+        return opens
+    }
+
+    /**
      * Walks the raw event log since [sinceMillis] to find the package currently in the
      * foreground. More responsive than [android.app.usage.UsageStats] aggregates, which can
      * lag by up to a minute.

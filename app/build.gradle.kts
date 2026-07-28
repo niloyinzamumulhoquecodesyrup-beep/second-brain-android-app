@@ -1,7 +1,9 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -14,6 +16,11 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+
+        // Override with -PSB_BASE_URL=https://your-domain.vercel.app or by editing gradle.properties.
+        val baseUrl = (project.findProperty("SB_BASE_URL") as String?)
+            ?: "https://second-brain-pi-six.vercel.app"
+        buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
     }
 
     buildTypes {
@@ -34,6 +41,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -67,6 +75,21 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
 
     implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("io.coil-kt:coil-compose:2.6.0")
+    // Pinned to 1.0.0 (not the latest) — newer releases pull in an androidx.activity transitive
+    // dependency that requires compileSdk 36 / AGP 8.9.1+, well ahead of this project's AGP
+    // 8.5.2 / compileSdk 34. 1.0.0's own activity-compose pin (1.9.3) is compatible.
+    implementation("dev.chrisbanes.haze:haze:1.0.0")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+    implementation("com.google.firebase:firebase-analytics")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Second Brain Lock"
+rootProject.name = "Shore Up"
 include(":app")

@@ -58,6 +58,7 @@
         android:text="You've used your time for today. This app unlocks automatically at midnight." />
 
     <LinearLayout
+        android:id="@+id/overlayCountdownPanel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="@drawable/overlay_panel_bg"

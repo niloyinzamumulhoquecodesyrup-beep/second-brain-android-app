@@ -1,26 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Shore Up mark: an approximation of the provided concentric-ring logo (a torus of thin
+     orange contour lines). Hand-built as nested ellipse strokes since the source was shown
+     inline in chat and no image file was available to trace exactly. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:pathData="M54,30m-22,0a22,22 0,1 1,44 0a22,22 0,1 1,-44 0"
-        android:strokeColor="#5eead4"
-        android:strokeWidth="2.5"
-        android:fillColor="#00000000" />
-    <path
-        android:pathData="M34,54 L74,54"
-        android:strokeColor="#e0c07e"
-        android:strokeWidth="2.5" />
-    <path
-        android:pathData="M40,70 L68,70"
-        android:strokeColor="#a78bfa"
-        android:strokeWidth="2.5" />
-    <path
-        android:pathData="M44,20 L64,20 L64,40 L54,48 L44,40 Z"
-        android:fillColor="#5eead4"
-        android:fillAlpha="0.18"
-        android:strokeColor="#5eead4"
-        android:strokeWidth="2" />
+    <path android:pathData="M10.0,54.0 A44.0,56.3 0 1,0 98.0,54.0 A44.0,56.3 0 1,0 10.0,54.0 Z" android:strokeColor="#FFA82E" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M12.0,54.0 A42.0,53.8 0 1,0 96.0,54.0 A42.0,53.8 0 1,0 12.0,54.0 Z" android:strokeColor="#FFA32A" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M14.0,54.0 A40.0,51.2 0 1,0 94.0,54.0 A40.0,51.2 0 1,0 14.0,54.0 Z" android:strokeColor="#FF9F27" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M16.0,54.0 A38.0,48.6 0 1,0 92.0,54.0 A38.0,48.6 0 1,0 16.0,54.0 Z" android:strokeColor="#FF9B24" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M18.0,54.0 A36.0,46.1 0 1,0 90.0,54.0 A36.0,46.1 0 1,0 18.0,54.0 Z" android:strokeColor="#FF9721" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M20.0,54.0 A34.0,43.5 0 1,0 88.0,54.0 A34.0,43.5 0 1,0 20.0,54.0 Z" android:strokeColor="#FF931E" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M22.0,54.0 A32.0,41.0 0 1,0 86.0,54.0 A32.0,41.0 0 1,0 22.0,54.0 Z" android:strokeColor="#FF8F1B" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M24.0,54.0 A30.0,38.4 0 1,0 84.0,54.0 A30.0,38.4 0 1,0 24.0,54.0 Z" android:strokeColor="#FF8B18" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M26.0,54.0 A28.0,35.8 0 1,0 82.0,54.0 A28.0,35.8 0 1,0 26.0,54.0 Z" android:strokeColor="#FF8615" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M28.0,54.0 A26.0,33.3 0 1,0 80.0,54.0 A26.0,33.3 0 1,0 28.0,54.0 Z" android:strokeColor="#FF8212" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M30.0,54.0 A24.0,30.7 0 1,0 78.0,54.0 A24.0,30.7 0 1,0 30.0,54.0 Z" android:strokeColor="#FF7E0F" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M32.0,54.0 A22.0,28.2 0 1,0 76.0,54.0 A22.0,28.2 0 1,0 32.0,54.0 Z" android:strokeColor="#FF7A0C" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M34.0,54.0 A20.0,25.6 0 1,0 74.0,54.0 A20.0,25.6 0 1,0 34.0,54.0 Z" android:strokeColor="#FF7609" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M36.0,54.0 A18.0,23.0 0 1,0 72.0,54.0 A18.0,23.0 0 1,0 36.0,54.0 Z" android:strokeColor="#FF7206" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M38.0,54.0 A16.0,20.5 0 1,0 70.0,54.0 A16.0,20.5 0 1,0 38.0,54.0 Z" android:strokeColor="#FF6E03" android:strokeWidth="0.9" android:fillColor="#00000000" />
+    <path android:pathData="M40.0,54.0 A14.0,17.9 0 1,0 68.0,54.0 A14.0,17.9 0 1,0 40.0,54.0 Z" android:strokeColor="#FF6A00" android:strokeWidth="0.9" android:fillColor="#00000000" />
 </vector>

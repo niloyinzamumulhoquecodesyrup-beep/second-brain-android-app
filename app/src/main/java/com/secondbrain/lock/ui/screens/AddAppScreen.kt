@@ -21,6 +21,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Remove
@@ -55,11 +57,13 @@ import com.secondbrain.lock.util.drawableToImageBitmap
 fun AddAppScreen(
     apps: List<InstalledAppInfo>,
     onBack: () -> Unit,
-    onConfirm: (InstalledAppInfo, Int) -> Unit
+    onConfirm: (InstalledAppInfo, Int, Int?) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<InstalledAppInfo?>(null) }
     var minutes by remember { mutableStateOf(30) }
+    var openLimitEnabled by remember { mutableStateOf(false) }
+    var openLimit by remember { mutableStateOf(10) }
 
     val filtered = remember(query, apps) {
         if (query.isBlank()) apps else apps.filter { it.label.contains(query, ignoreCase = true) }
@@ -134,6 +138,38 @@ fun AddAppScreen(
                         Icon(Icons.Filled.Add, contentDescription = "Increase", tint = Emerald400)
                     }
                 }
+
+                Spacer(Modifier.height(24.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth().clickable { openLimitEnabled = !openLimitEnabled }
+                ) {
+                    SbLabel("Also cap opens/day")
+                    Switch(
+                        checked = openLimitEnabled,
+                        onCheckedChange = { openLimitEnabled = it },
+                        colors = SwitchDefaults.colors(checkedTrackColor = Emerald400, checkedThumbColor = Ink950)
+                    )
+                }
+                if (openLimitEnabled) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                        IconButton(onClick = { if (openLimit > 1) openLimit -= 1 }) {
+                            Icon(Icons.Filled.Remove, contentDescription = "Decrease", tint = Emerald400)
+                        }
+                        Text(
+                            "$openLimit opens",
+                            style = SecondBrainTypography.titleMedium,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                        IconButton(onClick = { if (openLimit < 100) openLimit += 1 }) {
+                            Icon(Icons.Filled.Add, contentDescription = "Increase", tint = Emerald400)
+                        }
+                    }
+                }
+
                 Spacer(Modifier.height(28.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(
@@ -142,7 +178,7 @@ fun AddAppScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = Ink600, contentColor = Mist300)
                     ) { Text("Back") }
                     Button(
-                        onClick = { onConfirm(app, minutes) },
+                        onClick = { onConfirm(app, minutes, if (openLimitEnabled) openLimit else null) },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = Emerald400, contentColor = Ink950)
                     ) { Text("Lock it in") }

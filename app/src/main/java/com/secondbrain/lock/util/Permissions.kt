@@ -8,11 +8,22 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.secondbrain.lock.data.UsageStatsHelper
+import com.secondbrain.lock.service.LockAccessibilityService
 
 object Permissions {
 
     fun hasOverlay(context: Context): Boolean =
         Settings.canDrawOverlays(context)
+
+    /** Optional — [com.secondbrain.lock.service.MonitorService]'s poller works without this. */
+    fun hasAccessibility(context: Context): Boolean {
+        val expected = "${context.packageName}/${LockAccessibilityService::class.java.name}"
+        val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+            ?: return false
+        return enabled.split(':').any { it.equals(expected, ignoreCase = true) }
+    }
+
+    fun accessibilityIntent(): Intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
 
     fun hasUsageAccess(context: Context): Boolean =
         UsageStatsHelper.hasUsageAccess(context)
