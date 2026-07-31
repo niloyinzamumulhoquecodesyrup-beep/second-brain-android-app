@@ -11,20 +11,31 @@ import androidx.compose.ui.graphics.Color
  */
 private val isLight: Boolean get() = SbThemeState.mode == ThemeMode.LIGHT
 
-// Ink — background scale
-val Ink950: Color get() = if (isLight) Color(0xFFF8F7FC) else Color(0xFF050607)
-val Ink900: Color get() = if (isLight) Color(0xFFFFFFFF) else Color(0xFF0A0C0E)
-val Ink800: Color get() = if (isLight) Color(0xFFF5F4F8) else Color(0xFF111417)
-val Ink700: Color get() = if (isLight) Color(0xFFE6E3F0) else Color(0xFF181C20)
-val Ink600: Color get() = if (isLight) Color(0xFFCFCCDC) else Color(0xFF22272C)
-val Ink500: Color get() = if (isLight) Color(0xFFB7B2C8) else Color(0xFF2C3238)
+// Ink — background scale, lifted from the Streak Section redesign's v2 bg/cardAlt/border/track
+// tokens. 700/600/500 are the design's translucent border/track values pre-composited to opaque
+// hex over cardAlt, since call sites here use them as solid fills (buttons, dots, progress
+// tracks), not just card-edge borders like the source design does.
+val Ink950: Color get() = if (isLight) Color(0xFFF4F5F7) else Color(0xFF08090B)
+val Ink900: Color get() = if (isLight) Color(0xFFFFFFFF) else Color(0xFF24343A)
+val Ink800: Color get() = if (isLight) Color(0xFFFAFAFB) else Color(0xFF1B282C)
+val Ink700: Color get() = if (isLight) Color(0xFFECEDED) else Color(0xFF3D4B51)
+val Ink600: Color get() = if (isLight) Color(0xFFCBD0D4) else Color(0xFF39474D)
+val Ink500: Color get() = if (isLight) Color(0xFFB8BCBF) else Color(0xFF455358)
 
-// Mist — text scale
-val Mist100: Color get() = if (isLight) Color(0xFF30323D) else Color(0xFFE7E9EB)
-val Mist300: Color get() = if (isLight) Color(0xFF525662) else Color(0xFFA7AEB5)
-val Mist500: Color get() = if (isLight) Color(0xFF757B85) else Color(0xFF6A717A)
+// Mist — text scale, lifted from the same design's textPrimary/Secondary/Tertiary tokens.
+val Mist100: Color get() = if (isLight) Color(0xFF121B1E) else Color(0xFFF4F5F7)
+val Mist300: Color get() = if (isLight) Color(0xFF6D7476) else Color(0x9EF4F5F7)
+val Mist500: Color get() = if (isLight) Color(0x6B121B1E) else Color(0x66F4F5F7)
 /** Legacy alias kept for existing call sites — maps to the dimmest text tier. */
 val Mist400: Color get() = Mist500
+
+// Streak — the reward/streak feature's palette. accentRed/silver/callisto are flat across light
+// and dark (the design keeps them fixed); StreakCard is the design's tinted `card` surface,
+// which the streak feature's cards use in place of the app's plain Ink900/cardAlt.
+val StreakCard: Color get() = if (isLight) Color(0xFFD9E6E9) else Color(0xFF1C2A2E)
+val StreakAccent: Color = Color(0xFFFB4F40)
+val StreakSilver: Color = Color(0xFF8C8E8F)
+val StreakCallisto: Color = Color(0xFFCBD0D4)
 
 // Emerald — primary accent
 val Emerald400: Color get() = if (isLight) Color(0xFF6D57BC) else Color(0xFF5EEAD4)

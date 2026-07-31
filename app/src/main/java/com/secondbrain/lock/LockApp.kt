@@ -8,12 +8,23 @@ import android.net.Uri
 import android.os.Build
 import coil.Coil
 import coil.ImageLoader
+import com.secondbrain.lock.data.LocalCache
 import com.secondbrain.lock.data.SecurePrefs
+import com.secondbrain.lock.data.repo.MindQueueRepository
+import com.secondbrain.lock.data.repo.MindRepository
+import com.secondbrain.lock.data.repo.MindverseRepository
+import com.secondbrain.lock.data.repo.NotesRepository
+import com.secondbrain.lock.data.repo.PlannerRepository
+import com.secondbrain.lock.data.repo.ProfileRepository
+import com.secondbrain.lock.data.repo.RemindersRepository
+import com.secondbrain.lock.data.repo.StatsRepository
+import com.secondbrain.lock.data.repo.TasksRepository
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.service.Overlays
 import com.secondbrain.lock.ui.theme.SbThemeState
 import com.secondbrain.lock.ui.theme.ThemeMode
 import com.secondbrain.lock.widget.SectographUpdateWorker
+import kotlinx.coroutines.runBlocking
 
 class LockApp : Application() {
     override fun onCreate() {
@@ -21,6 +32,23 @@ class LockApp : Application() {
 
         ApiClient.init(this)
         Overlays.init(this)
+        LocalCache.init(this)
+        // Local-first: every repository's last-saved data is loaded into memory before the first
+        // screen composes, so the UI shows it immediately (even if stale) instead of a blank
+        // state while each screen's own network refresh() is still in flight. These are just a
+        // handful of local SQLite reads, so blocking here briefly (like the theme read below) is
+        // cheap relative to the rest of process startup.
+        runBlocking {
+            MindRepository.restore()
+            MindQueueRepository.restore()
+            MindverseRepository.restore()
+            NotesRepository.restore()
+            PlannerRepository.restore()
+            ProfileRepository.restore()
+            RemindersRepository.restore()
+            StatsRepository.restore()
+            TasksRepository.restore()
+        }
         // Reuses ApiClient's OkHttp client (bearer-token interceptor included) so any AsyncImage
         // pointed at an authenticated endpoint like /api/auth/avatar just works.
         Coil.setImageLoader(ImageLoader.Builder(this).okHttpClient(ApiClient.client).build())

@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -54,6 +55,23 @@ fun SbLabel(text: String, color: Color = Emerald400, modifier: Modifier = Modifi
         text = text.uppercase(),
         color = color,
         style = SecondBrainTypography.labelSmall,
+        modifier = modifier
+    )
+}
+
+/** The bold eyebrow header used atop a card's hero content — e.g. "YOU'RE DOING GREAT",
+ * "TASKS", "ROUTINES". Distinct from [SbLabel]'s lighter-weight, wider-tracked style, which is
+ * for secondary in-card sub-labels rather than a card's own title. Uppercases by default; pass
+ * `uppercase = false` for copy that's meant to read as a sentence (e.g. NudgesStrip's "When
+ * you're ready"), not shouted. */
+@Composable
+fun SbSectionTitle(text: String, color: Color, modifier: Modifier = Modifier, uppercase: Boolean = true) {
+    Text(
+        text = if (uppercase) text.uppercase() else text,
+        color = color,
+        fontSize = 12.sp,
+        letterSpacing = 1.4.sp,
+        fontWeight = FontWeight.Bold,
         modifier = modifier
     )
 }

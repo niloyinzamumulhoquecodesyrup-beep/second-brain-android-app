@@ -59,7 +59,8 @@ fun DashboardScreen(
     onToggleSchedule: (AppLimit, Boolean) -> Unit,
     onToggleFocus: (AppLimit, Boolean) -> Unit,
     onOpenSettings: () -> Unit,
-    contentPadding: PaddingValues = PaddingValues()
+    contentPadding: PaddingValues = PaddingValues(),
+    topBar: @Composable () -> Unit = {}
 ) {
     Scaffold(
         containerColor = Ink950,
@@ -89,6 +90,8 @@ fun DashboardScreen(
                     bottom = 28.dp
                 )
         ) {
+            topBar()
+            Spacer(Modifier.height(8.dp))
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,

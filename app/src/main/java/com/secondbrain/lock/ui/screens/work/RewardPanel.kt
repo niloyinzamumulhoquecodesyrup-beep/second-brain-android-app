@@ -1,19 +1,18 @@
 package com.secondbrain.lock.ui.screens.work
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -23,112 +22,121 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.secondbrain.lock.network.dto.DayCount
 import com.secondbrain.lock.network.dto.Stats
-import com.secondbrain.lock.ui.theme.Emerald400
-import com.secondbrain.lock.ui.theme.Gold500
 import com.secondbrain.lock.ui.theme.Ink700
+import com.secondbrain.lock.ui.theme.Ink900
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
-import com.secondbrain.lock.ui.theme.Orange400
-import com.secondbrain.lock.ui.theme.SbCard
-import com.secondbrain.lock.ui.theme.SbLabel
+import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
-import com.secondbrain.lock.ui.theme.Sky400
-import com.secondbrain.lock.ui.theme.Violet400
+import com.secondbrain.lock.ui.theme.StreakAccent
+import com.secondbrain.lock.ui.theme.StreakCard
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
 /**
- * Ports components/RewardPanel.js field-for-field: same streak rule, same 9 badges, same
- * daily quote rotation, same per-dimension level curve and adaptive (7-day median) daily
- * target. The one deliberate simplification is the gauge itself — the web's animated glass
- * "tank" SVG becomes a plain filled capsule here; the numbers, colors, and copy all match.
+ * Compact, clickable streak card — mirrors the Streak Section redesign's summary screen.
+ * Tapping it opens [com.secondbrain.lock.ui.screens.work.StreakDetailScreen], which hosts the
+ * badges/gauges/activity-calendar detail this card used to show inline.
  */
 @Composable
-fun RewardPanel(stats: Stats?) {
-    SbCard(topBorderColor = Gold500) {
-        SbLabel("You're doing great", color = Gold500)
-        Spacer(Modifier.height(6.dp))
-        if (stats == null) {
+fun RewardPanel(stats: Stats?, onOpenDetail: () -> Unit) {
+    if (stats == null) {
+        StreakSurface {
             Text("Loading…", color = Mist400, style = SecondBrainTypography.bodyMedium)
-            return@SbCard
         }
+        return
+    }
+    val computed = remember(stats) { RewardMath.from(stats) }
+    StreakSummaryCard(computed = computed, onClick = onOpenDetail)
+}
 
-        val computed = remember(stats) { RewardMath.from(stats) }
+/** The design's `neutralCard`: a 24dp-radius, 20dp-padded card tinted with [StreakCard]. */
+@Composable
+internal fun StreakSurface(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(StreakCard)
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+            .padding(20.dp),
+        content = content
+    )
+}
 
+/** A round icon bubble matching the design's `iconChip`/`smallIconChip` (bg = Ink900/cardAlt). */
+@Composable
+internal fun StreakIconChip(icon: String, size: androidx.compose.ui.unit.Dp, fontSize: androidx.compose.ui.unit.TextUnit) {
+    Box(
+        modifier = Modifier.size(size).clip(CircleShape).background(Ink900),
+        contentAlignment = Alignment.Center
+    ) { Text(icon, fontSize = fontSize) }
+}
+
+/** The design's accent-red circular arrow badge (`cornerArrow`/`cornerArrowSm`). */
+@Composable
+internal fun StreakArrowBadge(size: androidx.compose.ui.unit.Dp, fontSize: androidx.compose.ui.unit.TextUnit) {
+    Box(
+        modifier = Modifier.size(size).clip(CircleShape).background(StreakAccent),
+        contentAlignment = Alignment.Center
+    ) { Text("↗", color = Color.White, fontSize = fontSize) }
+}
+
+@Composable
+private fun StreakSummaryCard(computed: RewardComputation, onClick: () -> Unit) {
+    StreakSurface(onClick = onClick) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-            Text(
-                computed.headline,
-                style = SecondBrainTypography.headlineMedium,
-                color = Mist100,
-                modifier = Modifier.weight(1f)
-            )
-            if (computed.earned.isNotEmpty()) {
-                Row {
-                    computed.earned.takeLast(6).forEach { badge ->
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(Gold500.copy(alpha = 0.1f))
-                                .border(BorderStroke(1.dp, Gold500.copy(alpha = 0.4f)), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) { Text(badge.icon, fontSize = 14.sp) }
-                    }
-                }
+            SbSectionTitle("You're doing great", color = StreakAccent)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Tap for stats", color = Mist400, fontSize = 12.sp)
+                Spacer(Modifier.width(8.dp))
+                StreakArrowBadge(size = 34.dp, fontSize = 16.sp)
             }
         }
 
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("${computed.streak}-day ", color = Mist100, fontSize = 34.sp, fontWeight = FontWeight.Normal)
+            Text("streak", color = Mist100, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
+        }
+
         computed.next?.let { nextBadge ->
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Next: ${nextBadge.icon} ${nextBadge.label}",
-                color = Mist300,
-                style = SecondBrainTypography.bodySmall
+            Spacer(Modifier.height(6.dp))
+            Text("Next: ${nextBadge.icon} ${nextBadge.label}", color = Mist300, fontSize = 14.sp)
+        }
+
+        Spacer(Modifier.height(10.dp))
+        Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(4.dp)).background(Ink700)) {
+            Box(
+                Modifier.fillMaxWidth(computed.progressPercent / 100f).height(6.dp).clip(RoundedCornerShape(4.dp)).background(StreakAccent)
             )
         }
 
-        Spacer(Modifier.height(12.dp))
-        Text(
-            computed.quote,
-            color = Mist100,
-            style = SecondBrainTypography.bodySmall,
-            fontStyle = FontStyle.Italic
-        )
-
-        Spacer(Modifier.height(16.dp))
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            computed.gauges.forEach { gauge -> GaugeColumn(gauge) }
-        }
-
-        // Separate sections, each shown only when that period actually has something to
-        // report — an all-zero "This month: 0 notes · 0 tasks..." line reads as broken, not
-        // informative, on a fresh account with no history yet.
-        if (computed.week.hasData) {
-            Spacer(Modifier.height(14.dp))
-            Text(periodSummary("This week", computed.week), color = Mist300, style = SecondBrainTypography.bodySmall)
-        }
-        if (computed.month.hasData) {
-            Spacer(Modifier.height(if (computed.week.hasData) 2.dp else 14.dp))
-            Text(periodSummary("This month", computed.month), color = Mist300, style = SecondBrainTypography.bodySmall)
+        Spacer(Modifier.height(18.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            listOf("📚", "✅", "⏱️", "⚡").forEach { icon ->
+                StreakIconChip(icon, size = 44.dp, fontSize = 16.sp)
+                Spacer(Modifier.width(10.dp))
+            }
         }
     }
 }
 
-private fun periodSummary(label: String, totals: PeriodTotals): String =
+internal fun periodSummary(label: String, totals: PeriodTotals): String =
     "$label: ${totals.notes} notes · ${totals.tasks} tasks · ${totals.focusSessions} focus sessions · " +
         "${formatFocusMinutes(totals.focusMinutes)} focused"
 
-private fun formatFocusMinutes(total: Int): String {
+internal fun formatFocusMinutes(total: Int): String {
     if (total <= 0) return "0m"
     val h = total / 60
     val m = total % 60
@@ -139,20 +147,26 @@ private fun formatFocusMinutes(total: Int): String {
     }
 }
 
-internal data class Gauge(val label: String, val value: Int, val target: Int, val color: Color, val level: Int, val progress: Float)
+internal data class Gauge(val label: String, val value: Int, val target: Int, val level: Int, val progress: Float)
 internal data class Badge(val key: String, val label: String, val icon: String)
 internal data class PeriodTotals(val notes: Int, val tasks: Int, val focusSessions: Int, val focusMinutes: Int) {
     val hasData: Boolean get() = notes > 0 || tasks > 0 || focusSessions > 0 || focusMinutes > 0
 }
 
+internal data class MilestoneStatus(val badge: Badge, val achieved: Boolean, val progress: Float)
+
 internal data class RewardComputation(
+    val streak: Int,
     val headline: String,
     val earned: List<Badge>,
     val next: Badge?,
     val quote: String,
     val gauges: List<Gauge>,
     val week: PeriodTotals,
-    val month: PeriodTotals
+    val month: PeriodTotals,
+    val milestones: List<MilestoneStatus>,
+    /** Progress (0-100) toward the next unearned milestone — drives both the summary card's and the detail progress card's bar. */
+    val progressPercent: Int
 )
 
 /** Exposed for pages/work.js's handleCompletion-equivalent in WorkScreen.kt, which needs just
@@ -238,6 +252,19 @@ object RewardMath {
         BadgeDef("streak_7", "7-day streak", "🌟") { it.streak >= 7 }
     )
 
+    /** Numeric progress toward each badge's threshold, for the milestones list's progress bars. */
+    private fun progressToward(def: BadgeDef, s: BadgeStats): Float = when (def.key) {
+        "ten_captures" -> s.totalNotes / 10f
+        "ten_tasks" -> s.tasksDone / 10f
+        "focus_builder" -> s.focusSessionsTotal / 5f
+        "deep_focus" -> s.focusSessionsTotal / 25f
+        "focus_hour" -> s.focusMinutesTotal / 60f
+        "focus_marathon" -> s.focusMinutesTotal / 300f
+        "streak_3" -> s.streak / 3f
+        "streak_7" -> s.streak / 7f
+        else -> if (def.check(s)) 1f else 0f
+    }.coerceIn(0f, 1f)
+
     private val QUOTES = listOf(
         "Starting is the whole battle. You already won it today.",
         "Momentum doesn't care how small the first step was.",
@@ -283,6 +310,9 @@ object RewardMath {
         val badgeStats = BadgeStats(stats.totalNotes, stats.tasksDone, stats.focusSessionsTotal, stats.focusMinutesTotal, streak)
         val earned = BADGE_DEFS.filter { it.check(badgeStats) }.map { Badge(it.key, it.label, it.icon) }
         val next = BADGE_DEFS.firstOrNull { !it.check(badgeStats) }?.let { Badge(it.key, it.label, it.icon) }
+        val milestones = BADGE_DEFS.map { def ->
+            MilestoneStatus(Badge(def.key, def.label, def.icon), def.check(badgeStats), progressToward(def, badgeStats))
+        }
 
         val headline = when {
             streak > 0 -> "$streak-day streak"
@@ -301,64 +331,33 @@ object RewardMath {
         val (timeLevel, timeProgress) = levelInfo(stats.focusMinutesTotal)
 
         val gauges = listOf(
-            Gauge("Streak", streak, 7, Gold500, streakLevel, streakProgress),
-            Gauge("Captures", todayNotes, medianTarget(stats.capturesByDay), Emerald400, captureLevel, captureProgress),
-            Gauge("Tasks done", todayTasks, medianTarget(stats.tasksDoneByDay), Violet400, taskLevel, taskProgress),
-            Gauge("Focus sessions", todayFocus, medianTarget(stats.focusSessionsByDay), Orange400, focusLevel, focusProgress),
-            Gauge("Focus time", todayFocusMinutes, medianTarget(stats.focusMinutesByDay), Sky400, timeLevel, timeProgress)
+            Gauge("Streak", streak, 7, streakLevel, streakProgress),
+            Gauge("Captures", todayNotes, medianTarget(stats.capturesByDay), captureLevel, captureProgress),
+            Gauge("Tasks done", todayTasks, medianTarget(stats.tasksDoneByDay), taskLevel, taskProgress),
+            Gauge("Focus sessions", todayFocus, medianTarget(stats.focusSessionsByDay), focusLevel, focusProgress),
+            Gauge("Focus time", todayFocusMinutes, medianTarget(stats.focusMinutesByDay), timeLevel, timeProgress)
         )
 
-        return RewardComputation(headline, earned, next, quote, gauges, week, month)
+        val progressPercent = ((milestones.firstOrNull { !it.achieved }?.progress ?: 1f) * 100).roundToInt()
+
+        return RewardComputation(streak, headline, earned, next, quote, gauges, week, month, milestones, progressPercent)
     }
-}
 
-@Composable
-private fun GaugeColumn(gauge: Gauge) {
-    val tankHeight = 56.dp
-    val pct = if (gauge.target > 0) (gauge.value.toFloat() / gauge.target).coerceIn(0f, 1f) else 0f
-
-    Column(modifier = Modifier.width(68.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            gauge.label.uppercase(),
-            color = Mist400,
-            fontSize = 9.sp,
-            style = SecondBrainTypography.labelSmall,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .width(28.dp)
-                .height(tankHeight)
-                .clip(RoundedCornerShape(14.dp))
-                .background(Ink700),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(tankHeight * pct)
-                    .background(gauge.color)
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        Text("${gauge.value}", color = Mist100, style = SecondBrainTypography.bodySmall)
-        Spacer(Modifier.height(2.dp))
-        Text("Lv ${gauge.level}", color = Mist300, fontSize = 9.sp, style = SecondBrainTypography.labelSmall)
-        Spacer(Modifier.height(3.dp))
-        Box(
-            Modifier
-                .width(48.dp)
-                .height(3.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Ink700)
-        ) {
-            Box(
-                Modifier
-                    .fillMaxWidth(gauge.progress)
-                    .height(3.dp)
-                    .background(gauge.color)
-            )
+    /** 5 weeks (35 days) of combined activity level (0-3), oldest first, last entry = today. */
+    internal fun activityCalendar(stats: Stats, days: Int = 35): List<Int> {
+        val captures = stats.capturesByDay.associate { it.day to it.count }
+        val focus = stats.focusSessionsByDay.associate { it.day to it.count }
+        val tasks = stats.tasksDoneByDay.associate { it.day to it.count }
+        val today = LocalDate.now()
+        return (days - 1 downTo 0).map { i ->
+            val day = today.minusDays(i.toLong()).toString()
+            val total = (captures[day] ?: 0) + (focus[day] ?: 0) + (tasks[day] ?: 0)
+            when {
+                total <= 0 -> 0
+                total <= 2 -> 1
+                total <= 4 -> 2
+                else -> 3
+            }
         }
     }
 }

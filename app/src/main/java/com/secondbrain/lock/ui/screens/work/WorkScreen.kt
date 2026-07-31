@@ -19,13 +19,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.secondbrain.lock.data.repo.MindQueueRepository
 import com.secondbrain.lock.data.repo.PlannerRepository
 import com.secondbrain.lock.data.repo.StatsRepository
 import com.secondbrain.lock.data.repo.TasksRepository
-import com.secondbrain.lock.ui.theme.GradientText
-import com.secondbrain.lock.ui.theme.SbLabel
 import com.secondbrain.lock.ui.theme.fullAuraBackground
 import kotlinx.coroutines.launch
 
@@ -47,7 +44,12 @@ private val SURPRISE_LINES = listOf(
 
 /** Mirrors pages/work.js: NudgesStrip + RewardPanel + TasksPanel + RoutinePlanner + celebration. */
 @Composable
-fun WorkScreen(contentPadding: PaddingValues = PaddingValues()) {
+fun WorkScreen(
+    contentPadding: PaddingValues = PaddingValues(),
+    onOpenStreak: () -> Unit = {},
+    onOpenAllTasks: () -> Unit = {},
+    topBar: @Composable () -> Unit = {}
+) {
     val stats by StatsRepository.stats.collectAsState()
     var celebration by remember { mutableStateOf<Celebration?>(null) }
     // A NudgesStrip task reminder's "Open" sets this; TasksPanel scrolls/glows the matching row
@@ -92,18 +94,17 @@ fun WorkScreen(contentPadding: PaddingValues = PaddingValues()) {
                     bottom = contentPadding.calculateBottomPadding() + 16.dp
                 )
         ) {
-            SbLabel("Work")
-            Spacer(Modifier.height(4.dp))
-            GradientText("Today", fontSize = 28.sp)
+            topBar()
             Spacer(Modifier.height(16.dp))
             NudgesStrip(onOpenTask = { id -> highlightTaskId = id })
             Spacer(Modifier.height(16.dp))
-            RewardPanel(stats)
+            RewardPanel(stats, onOpenDetail = onOpenStreak)
             Spacer(Modifier.height(16.dp))
             TasksPanel(
                 onCompletion = ::handleCompletion,
                 highlightTaskId = highlightTaskId,
-                onHighlightConsumed = { highlightTaskId = null }
+                onHighlightConsumed = { highlightTaskId = null },
+                onSeeAll = onOpenAllTasks
             )
             Spacer(Modifier.height(16.dp))
             RoutinePlanner()

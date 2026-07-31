@@ -27,7 +27,9 @@ enum class Destination(
     SHIELD("shield", "Shield", Icons.Filled.Shield, Icons.Outlined.Shield);
 
     companion object {
-        val bottomBarOrder = listOf(WORK, ORGANIZE, MIND, MINDVERSE, SHIELD)
+        // SHIELD is intentionally left off the bottom bar for now (still reachable via the top
+        // bar's settings gear) — 4 evenly-split tabs reads better around the center "+" notch.
+        val bottomBarOrder = listOf(WORK, ORGANIZE, MIND, MINDVERSE)
 
         fun fromRoute(route: String?): Destination = entries.find { it.route == route } ?: WORK
     }

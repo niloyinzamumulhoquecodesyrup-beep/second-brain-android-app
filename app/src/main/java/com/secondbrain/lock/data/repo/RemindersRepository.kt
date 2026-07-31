@@ -1,5 +1,6 @@
 package com.secondbrain.lock.data.repo
 
+import com.secondbrain.lock.data.LocalCache
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.network.dto.OkResponse
 import com.secondbrain.lock.network.dto.Reminder
@@ -13,8 +14,12 @@ object RemindersRepository {
     private val _reminders = MutableStateFlow<List<Reminder>>(emptyList())
     val reminders: StateFlow<List<Reminder>> = _reminders.asStateFlow()
 
+    suspend fun restore() {
+        LocalCache.load<List<Reminder>>("reminders")?.let { _reminders.value = it }
+    }
+
     suspend fun refresh() {
-        ApiClient.getTyped<List<Reminder>>("/api/reminders").onSuccess { _reminders.value = it }
+        ApiClient.getTyped<List<Reminder>>("/api/reminders").onSuccess { _reminders.value = it; LocalCache.save("reminders", it) }
     }
 
     suspend fun act(id: String, action: String, minutes: Int? = null): Result<Unit> {

@@ -54,7 +54,11 @@ private suspend fun refreshAll() {
  * triggers POST /api/mind/synthesize (mirrors the web's "Ask Claude Code to refresh it" flow,
  * minus the client-side note-embedding step, which needs an on-device embedding model). */
 @Composable
-fun MindScreen(onOpenNote: (String) -> Unit = {}, contentPadding: PaddingValues = PaddingValues()) {
+fun MindScreen(
+    onOpenNote: (String) -> Unit = {},
+    contentPadding: PaddingValues = PaddingValues(),
+    topBar: @Composable () -> Unit = {}
+) {
     var tab by remember { mutableStateOf(MindTab.OVERVIEW) }
     var syncing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -74,6 +78,8 @@ fun MindScreen(onOpenNote: (String) -> Unit = {}, contentPadding: PaddingValues 
                     bottom = contentPadding.calculateBottomPadding() + 16.dp
                 )
         ) {
+            topBar()
+            Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 SbLabel("Mind model", modifier = Modifier.weight(1f))
                 if (syncing) {

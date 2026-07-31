@@ -27,19 +27,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.compose.rememberNavController
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.haze
-import dev.chrisbanes.haze.hazeChild
 import com.secondbrain.lock.data.AppLimit
 import com.secondbrain.lock.data.AppLimitRepository
 import com.secondbrain.lock.data.InstalledAppInfo
 import com.secondbrain.lock.data.InstalledAppsRepository
+import com.secondbrain.lock.data.LocalCache
 import com.secondbrain.lock.data.SchedulePrefs
 import com.secondbrain.lock.data.SecurePrefs
 import com.secondbrain.lock.data.SleepPrefs
@@ -49,6 +44,8 @@ import com.secondbrain.lock.service.MonitorService
 import com.secondbrain.lock.ui.nav.AppNavHost
 import com.secondbrain.lock.ui.nav.BottomBar
 import com.secondbrain.lock.ui.nav.Destination
+import com.secondbrain.lock.ui.nav.QuickAddChooserSheet
+import com.secondbrain.lock.ui.nav.QuickAddTaskSheet
 import com.secondbrain.lock.ui.nav.TopBar
 import com.secondbrain.lock.ui.screens.AddAppScreen
 import com.secondbrain.lock.ui.screens.DashboardRow
@@ -57,9 +54,8 @@ import com.secondbrain.lock.ui.screens.LoginScreen
 import com.secondbrain.lock.ui.screens.OnboardingScreen
 import com.secondbrain.lock.ui.screens.PermissionStep
 import com.secondbrain.lock.ui.screens.SettingsScreen
-import com.secondbrain.lock.ui.theme.Ink900
+import com.secondbrain.lock.ui.screens.organize.CaptureSheet
 import com.secondbrain.lock.ui.theme.SecondBrainLockTheme
-import com.secondbrain.lock.ui.theme.Violet600
 import com.secondbrain.lock.ui.wake.WakeFlowActivity
 import com.secondbrain.lock.util.Permissions
 import kotlinx.coroutines.Dispatchers
@@ -113,52 +109,65 @@ private fun RootApp() {
     }
 
     val navController = rememberNavController()
-    val hazeState = remember { HazeState() }
-    val glassStyle = HazeStyle(
-        backgroundColor = Ink900,
-        tints = listOf(HazeTint(Violet600.copy(alpha = 0.32f))),
-        blurRadius = 20.dp
-    )
+    // Built once and threaded down to every top-level tab so each one renders it as the first
+    // item in its own scrollable column — it scrolls away with the page instead of staying
+    // pinned.
+    val topBar: @Composable () -> Unit = {
+        TopBar(
+            onOpenSettings = { navController.navigate(Destination.SHIELD.route) },
+            onLogout = {
+                ApiClient.logout()
+                ProfileRepository.clear()
+                // A different account may log in next on this device — don't let its first
+                // launch flash the previous account's cached data before its own refresh lands.
+                scope.launch { LocalCache.clearAll() }
+                authToken = null
+            }
+        )
+    }
+
+    var quickAddStep by remember { mutableStateOf<QuickAddStep?>(null) }
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = {
-                TopBar(
-                    onOpenSettings = { navController.navigate(Destination.SHIELD.route) },
-                    onLogout = {
-                        ApiClient.logout()
-                        ProfileRepository.clear()
-                        authToken = null
-                    },
-                    modifier = Modifier.hazeChild(state = hazeState, style = glassStyle)
-                )
-            },
             bottomBar = {
-                BottomBar(
-                    navController,
-                    modifier = Modifier.hazeChild(state = hazeState, style = glassStyle)
-                )
+                BottomBar(navController, onAddClick = { quickAddStep = QuickAddStep.CHOOSER })
             }
         ) { padding ->
-            // Deliberately NOT wrapped in Modifier.padding(padding): the whole point of the glass
-            // bars is that real scrolled content passes underneath and blurs through them, so this
-            // has to draw full-bleed and BE the haze source. `padding` (the bar heights Scaffold
-            // just measured) is instead threaded down as contentPadding so each screen's own
-            // scrollable column keeps its resting content clear of the bars.
             AppNavHost(
                 navController = navController,
-                shieldContent = { shieldPadding -> SettingsFlow(shieldPadding) },
-                modifier = Modifier.fillMaxSize().haze(state = hazeState),
+                shieldContent = { shieldPadding -> SettingsFlow(shieldPadding, topBar) },
+                topBar = topBar,
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = padding
             )
+        }
+
+        when (quickAddStep) {
+            QuickAddStep.CHOOSER -> QuickAddChooserSheet(
+                onDismiss = { quickAddStep = null },
+                onPickTask = { quickAddStep = QuickAddStep.TASK },
+                onPickCapture = { quickAddStep = QuickAddStep.CAPTURE }
+            )
+            QuickAddStep.TASK -> QuickAddTaskSheet(
+                onDismiss = { quickAddStep = null },
+                onCreated = { quickAddStep = null }
+            )
+            QuickAddStep.CAPTURE -> CaptureSheet(
+                onDismiss = { quickAddStep = null },
+                onCaptured = { quickAddStep = null }
+            )
+            null -> {}
         }
     }
 }
 
+private enum class QuickAddStep { CHOOSER, TASK, CAPTURE }
+
 /** The native onboarding + app-limit dashboard flow, now living under the Shield tab. */
 @Composable
-private fun SettingsFlow(contentPadding: PaddingValues = PaddingValues()) {
+private fun SettingsFlow(contentPadding: PaddingValues = PaddingValues(), topBar: @Composable () -> Unit = {}) {
     val context = LocalContext.current
     val repo = remember { AppLimitRepository(context) }
     val scope = rememberCoroutineScope()
@@ -285,7 +294,8 @@ private fun SettingsFlow(contentPadding: PaddingValues = PaddingValues()) {
                     scope.launch(Dispatchers.IO) { repo.setBlockDuringFocus(limit, enabled) }
                 },
                 onOpenSettings = { screen = SettingsTab.SETTINGS },
-                contentPadding = contentPadding
+                contentPadding = contentPadding,
+                topBar = topBar
             )
         }
 

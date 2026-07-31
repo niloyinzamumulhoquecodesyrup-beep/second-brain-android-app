@@ -1,5 +1,6 @@
 package com.secondbrain.lock.data.repo
 
+import com.secondbrain.lock.data.LocalCache
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.network.dto.CreatePlannerBlockRequest
 import com.secondbrain.lock.network.dto.CreatePlannerRoutineRequest
@@ -23,16 +24,21 @@ object PlannerRepository {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    suspend fun restore() {
+        LocalCache.load<PlannerDayResponse>("planner_today")?.let { _today.value = it }
+        LocalCache.load<List<PlannerRoutine>>("planner_routines")?.let { _routines.value = it }
+    }
+
     suspend fun refreshToday() {
         val date = LocalDate.now().toString()
         ApiClient.getTyped<PlannerDayResponse>("/api/planner?from=$date&days=1")
-            .onSuccess { _today.value = it; _error.value = null }
+            .onSuccess { _today.value = it; _error.value = null; LocalCache.save("planner_today", it) }
             .onFailure { _error.value = it.message ?: "Couldn't load today's plan" }
     }
 
     suspend fun refreshRoutines() {
         ApiClient.getTyped<List<PlannerRoutine>>("/api/planner/routines")
-            .onSuccess { _routines.value = it; _error.value = null }
+            .onSuccess { _routines.value = it; _error.value = null; LocalCache.save("planner_routines", it) }
             .onFailure { _error.value = it.message ?: "Couldn't load routines" }
     }
 

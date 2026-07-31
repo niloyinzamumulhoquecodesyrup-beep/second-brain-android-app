@@ -48,7 +48,7 @@ import kotlinx.coroutines.launch
  * box/currently-studying) was dropped — not needed for now.
  */
 @Composable
-fun MindverseScreen(contentPadding: PaddingValues = PaddingValues()) {
+fun MindverseScreen(contentPadding: PaddingValues = PaddingValues(), topBar: @Composable () -> Unit = {}) {
     val identity by MindverseRepository.identity.collectAsState()
     val identityChecked by MindverseRepository.identityChecked.collectAsState()
 
@@ -65,6 +65,8 @@ fun MindverseScreen(contentPadding: PaddingValues = PaddingValues()) {
                     bottom = contentPadding.calculateBottomPadding() + 16.dp
                 )
         ) {
+            topBar()
+            Spacer(Modifier.height(8.dp))
             SbLabel("Cross-account, anonymous")
             Spacer(Modifier.height(4.dp))
             GradientText("MINDVERSE", fontSize = 28.sp)

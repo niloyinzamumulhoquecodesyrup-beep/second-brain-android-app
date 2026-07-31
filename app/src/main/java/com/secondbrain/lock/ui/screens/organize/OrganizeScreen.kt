@@ -42,7 +42,8 @@ fun OrganizeScreen(
     onOpenNote: (String) -> Unit,
     tagFilter: String? = null,
     onClearTag: () -> Unit = {},
-    contentPadding: PaddingValues = PaddingValues()
+    contentPadding: PaddingValues = PaddingValues(),
+    topBar: @Composable () -> Unit = {}
 ) {
     val notes by NotesRepository.paraNotes.collectAsState()
     val graduated by NotesRepository.graduatedNotes.collectAsState()
@@ -69,6 +70,8 @@ fun OrganizeScreen(
                     bottom = contentPadding.calculateBottomPadding() + 16.dp
                 )
         ) {
+            topBar()
+            Spacer(Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     SbLabel("Organize")

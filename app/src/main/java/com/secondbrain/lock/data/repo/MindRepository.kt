@@ -1,5 +1,6 @@
 package com.secondbrain.lock.data.repo
 
+import com.secondbrain.lock.data.LocalCache
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.network.dto.MindCyclesResponse
 import com.secondbrain.lock.network.dto.MindInsightsResponse
@@ -34,26 +35,40 @@ object MindRepository {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    /** Loads the last-saved data into every StateFlow above so the Mind tab has something to
+     * show the instant the app opens, before the network refreshes below land. */
+    suspend fun restore() {
+        LocalCache.load<MindInsightsResponse>("mind_insights")?.let { _insights.value = it }
+        LocalCache.load<List<MindSection>>("mind_sections")?.let { _sections.value = it }
+        LocalCache.load<MindCyclesResponse>("mind_cycles")?.let { _cycles.value = it }
+        LocalCache.load<List<MindTopic>>("mind_topics")?.let { _topics.value = it }
+        LocalCache.load<List<MindLibraryEntry>>("mind_library")?.let { _library.value = it }
+    }
+
     suspend fun refreshInsights() {
         ApiClient.getTyped<MindInsightsResponse>("/api/mind/insights")
-            .onSuccess { _insights.value = it; _error.value = null }
+            .onSuccess { _insights.value = it; _error.value = null; LocalCache.save("mind_insights", it) }
             .onFailure { _error.value = it.message ?: "Couldn't load insights" }
     }
 
     suspend fun refreshSections() {
-        ApiClient.getTyped<MindSectionsResponse>("/api/mind/sections").onSuccess { _sections.value = it.sections }
+        ApiClient.getTyped<MindSectionsResponse>("/api/mind/sections")
+            .onSuccess { _sections.value = it.sections; LocalCache.save("mind_sections", it.sections) }
     }
 
     suspend fun refreshCycles() {
-        ApiClient.getTyped<MindCyclesResponse>("/api/mind/cycles").onSuccess { _cycles.value = it }
+        ApiClient.getTyped<MindCyclesResponse>("/api/mind/cycles")
+            .onSuccess { _cycles.value = it; LocalCache.save("mind_cycles", it) }
     }
 
     suspend fun refreshTopics() {
-        ApiClient.getTyped<MindTopicsResponse>("/api/mind/topics").onSuccess { _topics.value = it.topics }
+        ApiClient.getTyped<MindTopicsResponse>("/api/mind/topics")
+            .onSuccess { _topics.value = it.topics; LocalCache.save("mind_topics", it.topics) }
     }
 
     suspend fun refreshLibrary() {
-        ApiClient.getTyped<MindLibraryResponse>("/api/mind/library").onSuccess { _library.value = it.entries }
+        ApiClient.getTyped<MindLibraryResponse>("/api/mind/library")
+            .onSuccess { _library.value = it.entries; LocalCache.save("mind_library", it.entries) }
     }
 
     suspend fun synthesize(): Result<Unit> = ApiClient.postTyped<OkResponse>("/api/mind/synthesize").map {}

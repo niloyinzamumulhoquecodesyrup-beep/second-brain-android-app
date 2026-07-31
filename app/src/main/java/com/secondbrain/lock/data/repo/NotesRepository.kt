@@ -1,5 +1,6 @@
 package com.secondbrain.lock.data.repo
 
+import com.secondbrain.lock.data.LocalCache
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.network.dto.CreateNoteRequest
 import com.secondbrain.lock.network.dto.MoveParaRequest
@@ -27,22 +28,35 @@ object NotesRepository {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    /** Only restores the untagged (all-notes) view — a tag-filtered result is a transient UI
+     * selection, not the base dataset, so it's never cached. */
+    suspend fun restore() {
+        LocalCache.load<List<Note>>("notes_para")?.let { _paraNotes.value = it }
+        LocalCache.load<List<Note>>("notes_graduated")?.let { _graduatedNotes.value = it }
+        LocalCache.load<List<Packet>>("notes_packets")?.let { _packets.value = it }
+    }
+
     suspend fun refreshPara(tag: String? = null) {
         val query = if (tag.isNullOrBlank()) "" else "?tag=${tag}"
         ApiClient.getTyped<List<Note>>("/api/notes$query")
-            .onSuccess { notes -> _paraNotes.value = notes.filter { !it.graduated }; _error.value = null }
+            .onSuccess { notes ->
+                val filtered = notes.filter { !it.graduated }
+                _paraNotes.value = filtered
+                _error.value = null
+                if (tag.isNullOrBlank()) LocalCache.save("notes_para", filtered)
+            }
             .onFailure { _error.value = it.message ?: "Couldn't load notes" }
     }
 
     suspend fun refreshGraduated() {
         ApiClient.getTyped<List<Note>>("/api/notes?graduated=true")
-            .onSuccess { _graduatedNotes.value = it }
+            .onSuccess { _graduatedNotes.value = it; LocalCache.save("notes_graduated", it) }
             .onFailure { _error.value = it.message ?: "Couldn't load graduated notes" }
     }
 
     suspend fun refreshPackets() {
         ApiClient.getPackets()
-            .onSuccess { _packets.value = it }
+            .onSuccess { _packets.value = it; LocalCache.save("notes_packets", it) }
             .onFailure { _error.value = it.message ?: "Couldn't load packets" }
     }
 

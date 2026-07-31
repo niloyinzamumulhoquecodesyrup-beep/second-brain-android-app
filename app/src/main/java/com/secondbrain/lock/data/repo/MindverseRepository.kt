@@ -1,5 +1,6 @@
 package com.secondbrain.lock.data.repo
 
+import com.secondbrain.lock.data.LocalCache
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.network.dto.CommunityBook
 import com.secondbrain.lock.network.dto.CommunityMessage
@@ -51,19 +52,35 @@ object MindverseRepository {
 
     fun clearError() { _error.value = null }
 
+    /** Loads last-saved community content into its StateFlows. Live-session state (current room,
+     * its messages/participants, and the identity-checked flag) is intentionally not persisted —
+     * it isn't meaningful across a restart. */
+    suspend fun restore() {
+        LocalCache.load<OtherBrainsIdentity>("mv_identity")?.let { _identity.value = it }
+        LocalCache.load<List<CommunityMessage>>("mv_messages")?.let { _messages.value = it }
+        LocalCache.load<List<CommunitySuggestion>>("mv_suggestions")?.let { _suggestions.value = it }
+        LocalCache.load<List<CommunityBook>>("mv_books")?.let { _books.value = it }
+        LocalCache.load<List<MindcordDomain>>("mv_domains")?.let { _domains.value = it }
+        LocalCache.load<List<OtherBrainsCluster>>("mv_clusters")?.let { _clusters.value = it }
+    }
+
     suspend fun refreshIdentity() {
         ApiClient.getOtherBrainsIdentity()
-            .onSuccess { _identity.value = it.identity; _identityChecked.value = true }
+            .onSuccess {
+                _identity.value = it.identity
+                _identityChecked.value = true
+                LocalCache.save("mv_identity", it.identity)
+            }
     }
 
     suspend fun setDisplayName(name: String): Result<Unit> =
         ApiClient.setOtherBrainsIdentity(name)
-            .onSuccess { _identity.value = it.identity }
+            .onSuccess { _identity.value = it.identity; LocalCache.save("mv_identity", it.identity) }
             .onFailure { _error.value = it.message ?: "Couldn't set display name" }
             .map {}
 
     suspend fun refreshMessages() {
-        ApiClient.getCommunityMessages().onSuccess { _messages.value = it.messages }
+        ApiClient.getCommunityMessages().onSuccess { _messages.value = it.messages; LocalCache.save("mv_messages", it.messages) }
     }
 
     suspend fun sendMessage(body: String): Result<Unit> =
@@ -73,7 +90,8 @@ object MindverseRepository {
             .map {}
 
     suspend fun refreshSuggestions() {
-        ApiClient.getCommunitySuggestions().onSuccess { _suggestions.value = it.suggestions }
+        ApiClient.getCommunitySuggestions()
+            .onSuccess { _suggestions.value = it.suggestions; LocalCache.save("mv_suggestions", it.suggestions) }
     }
 
     suspend fun sendSuggestion(body: String): Result<Unit> =
@@ -83,7 +101,7 @@ object MindverseRepository {
             .map {}
 
     suspend fun refreshBooks() {
-        ApiClient.getCommunityBooks().onSuccess { _books.value = it.books }
+        ApiClient.getCommunityBooks().onSuccess { _books.value = it.books; LocalCache.save("mv_books", it.books) }
     }
 
     suspend fun saveBook(title: String, note: String): Result<Unit> =
@@ -93,11 +111,11 @@ object MindverseRepository {
             .map {}
 
     suspend fun refreshDomains() {
-        ApiClient.getMindcordDomains().onSuccess { _domains.value = it.domains }
+        ApiClient.getMindcordDomains().onSuccess { _domains.value = it.domains; LocalCache.save("mv_domains", it.domains) }
     }
 
     suspend fun refreshClusters() {
-        ApiClient.getOtherBrainsClusters().onSuccess { _clusters.value = it.clusters }
+        ApiClient.getOtherBrainsClusters().onSuccess { _clusters.value = it.clusters; LocalCache.save("mv_clusters", it.clusters) }
     }
 
     suspend fun joinRoom(domain: String): Result<Unit> =

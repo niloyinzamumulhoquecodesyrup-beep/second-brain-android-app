@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1097515764077",
+    "project_id": "scond-brain-androd-app",
+    "storage_bucket": "scond-brain-androd-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1097515764077:android:540592b9ade2596176f264",
+        "android_client_info": {
+          "package_name": "com.secondbrain.lock"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAeNoJbctFa1G4B4dLPxOBCxOTJaN9A6qE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

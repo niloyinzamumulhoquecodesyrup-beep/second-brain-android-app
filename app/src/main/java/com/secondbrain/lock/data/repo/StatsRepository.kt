@@ -1,5 +1,6 @@
 package com.secondbrain.lock.data.repo
 
+import com.secondbrain.lock.data.LocalCache
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.network.dto.DayCount
 import com.secondbrain.lock.network.dto.Stats
@@ -20,9 +21,13 @@ object StatsRepository {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    suspend fun restore() {
+        LocalCache.load<Stats>("stats")?.let { _stats.value = it }
+    }
+
     suspend fun refresh() {
         ApiClient.getTyped<Stats>("/api/stats")
-            .onSuccess { _stats.value = it; _error.value = null }
+            .onSuccess { _stats.value = it; _error.value = null; LocalCache.save("stats", it) }
             .onFailure { _error.value = it.message ?: "Couldn't load stats" }
     }
 

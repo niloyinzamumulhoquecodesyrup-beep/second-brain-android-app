@@ -5,12 +5,13 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,22 +19,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,25 +40,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.secondbrain.lock.data.FocusState
 import com.secondbrain.lock.data.RoutineRepository
-import com.secondbrain.lock.data.repo.MindQueueRepository
 import com.secondbrain.lock.data.repo.PlannerRepository
 import com.secondbrain.lock.data.repo.TasksRepository
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.network.dto.CreatePlannerBlockRequest
-import com.secondbrain.lock.network.dto.MindQueueItem
-import com.secondbrain.lock.network.dto.PlannerBlock
+import com.secondbrain.lock.network.dto.PlannerDayResponse
 import com.secondbrain.lock.network.dto.PlannerRoutine
 import com.secondbrain.lock.network.dto.Task
 import com.secondbrain.lock.network.dto.UpdatePlannerBlockRequest
-import com.secondbrain.lock.network.dto.taskSuggestionTitle
 import com.secondbrain.lock.ui.theme.Emerald400
 import com.secondbrain.lock.ui.theme.Gold500
 import com.secondbrain.lock.ui.theme.Ink500
+import com.secondbrain.lock.ui.theme.Ink600
+import com.secondbrain.lock.ui.theme.Ink700
+import com.secondbrain.lock.ui.theme.Ink800
 import com.secondbrain.lock.ui.theme.Ink950
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
@@ -73,32 +67,75 @@ import com.secondbrain.lock.ui.theme.Mist400
 import com.secondbrain.lock.ui.theme.Red400
 import com.secondbrain.lock.ui.theme.Rose400
 import com.secondbrain.lock.ui.theme.SbCard
-import com.secondbrain.lock.ui.theme.SbLabel
+import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
+import com.secondbrain.lock.ui.theme.StreakAccent
+import com.secondbrain.lock.ui.theme.StreakCard
+import com.secondbrain.lock.ui.theme.StreakSilver
 import com.secondbrain.lock.ui.theme.Violet400
+import androidx.compose.ui.text.style.TextDecoration
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Mirrors TodayCards.js's deterministic per-item icon/color pick (a hash of the item's id). */
-private val CARD_ICONS = listOf("📝", "⭐", "🎯", "🔔", "📌", "✨")
-private val CARD_COLORS = listOf(0xFFF87171, 0xFFFB923C, 0xFFFBBF24, 0xFFEAB308, 0xFF84CC16, 0xFF14B8A6).map { Color(it) }
-
-private fun <T> pick(list: List<T>, key: String): T {
-    var sum = 0
-    for (c in key) sum += c.code
-    return list[sum % list.size]
-}
-
 private val DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 
-private fun formatDueDate(raw: String): String =
+internal fun formatDueDate(raw: String): String =
     runCatching { LocalDate.parse(raw.take(10)).format(DUE_DATE_FORMAT) }.getOrDefault(raw)
 
-/** Opens the platform date picker anchored on [initial], reporting the picked day. */
-private fun pickDate(context: android.content.Context, initial: LocalDate, onPicked: (LocalDate) -> Unit) {
+internal fun dueDateOf(task: Task): LocalDate? =
+    task.dueDate?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+internal fun createdDateOf(task: Task): LocalDate? =
+    task.createdAt?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+/** An undated task only belongs in "today" on the day it was captured — after that it's a
+ * [isDraftTask], parked in AllTasksScreen's "More tasks" tab until it's scheduled. A task due
+ * strictly before today is an [isOverdueTask] instead — overdue items no longer clutter Today,
+ * they're parked in "More tasks" too until rescheduled or done. */
+internal fun isTodayTask(task: Task, today: LocalDate): Boolean {
+    val due = dueDateOf(task)
+    return if (due != null) due == today else createdDateOf(task) == today
+}
+
+internal fun isOverdueTask(task: Task, today: LocalDate): Boolean {
+    val due = dueDateOf(task)
+    return due != null && due < today
+}
+
+internal fun isDraftTask(task: Task, today: LocalDate): Boolean {
+    val due = dueDateOf(task)
+    return due == null && createdDateOf(task) != today
+}
+
+internal data class TaskSubtitleInfo(val text: String, val overdue: Boolean)
+
+internal fun taskSubtitleInfo(task: Task): TaskSubtitleInfo {
+    val dueRaw = task.dueDate
+    val dueDateLocal = dueDateOf(task)
+    val overdue = dueDateLocal != null && dueDateLocal < LocalDate.now() && !task.done
+    val dateText = when {
+        dueDateLocal == null -> "No due date"
+        overdue -> "overdue: ${formatDueDate(dueRaw!!)}"
+        else -> formatDueDate(dueRaw!!)
+    }
+    // A task with a chosen time (set via the quick-add sheet's "Time" picker) shows its window
+    // the same way a routine does, so the picked time is actually visible somewhere.
+    val startMin = task.startMin
+    val text = if (startMin != null) {
+        val timeRange = "${formatMinuteOfDay(startMin)} – ${formatMinuteOfDay(startMin + (task.durationMin ?: 0))}"
+        if (dueDateLocal != null) "$timeRange · $dateText" else timeRange
+    } else dateText
+    return TaskSubtitleInfo(text, overdue)
+}
+
+/** Opens the platform date picker anchored on [initial], reporting the picked day. Shared with
+ * QuickAddSheet's task-creation flow now that the inline add-task field has moved to the nav
+ * bar's "+" button. */
+internal fun pickDate(context: android.content.Context, initial: LocalDate, onPicked: (LocalDate) -> Unit) {
     DatePickerDialog(
         context,
         { _, year, month, day -> onPicked(LocalDate.of(year, month + 1, day)) },
@@ -106,36 +143,209 @@ private fun pickDate(context: android.content.Context, initial: LocalDate, onPic
     ).show()
 }
 
+/** A row in the merged "Today" list — either a real task or a routine occurrence (materialized
+ * or virtual-for-today), sorted together by [startMin]. Shared between the compact TasksPanel
+ * card and the full AllTasksScreen. */
+internal sealed class TodayItem(val startMin: Int?, val title: String) {
+    internal class TaskItem(val task: Task) : TodayItem(task.startMin, task.title)
+    internal class RoutineItem(val routine: PlannerRoutine, val block: com.secondbrain.lock.network.dto.PlannerBlock?) :
+        TodayItem(block?.startMin ?: routine.startMin, routine.title)
+}
+
+internal fun formatMinuteOfDay(minute: Int): String {
+    val h = (minute / 60) % 24
+    val m = minute % 60
+    return "%02d:%02d".format(h, m)
+}
+
+internal fun routineSubtitle(item: TodayItem.RoutineItem): String {
+    val startMin = item.startMin ?: item.routine.startMin
+    return "${formatMinuteOfDay(startMin)} – ${formatMinuteOfDay(startMin + item.routine.durationMin)}"
+}
+
+internal fun currentMinuteOfDay(): Int = LocalTime.now().let { it.hour * 60 + it.minute }
+
+/** Whether [startMin]..[startMin]+[durationMin] contains [nowMin], wrapping past midnight for
+ * overnight spans (e.g. a "Sleep" routine running 23:00-07:00). [nowMin] is passed in (rather
+ * than read via `LocalTime.now()` here) because a plain wall-clock read wouldn't ever trigger a
+ * recomposition on its own — callers hold it in a ticking `remember`d state instead so the
+ * "current" dot actually updates as time passes, not just when unrelated state changes. */
+internal fun isCurrentNow(startMin: Int?, durationMin: Int?, nowMin: Int): Boolean {
+    if (startMin == null) return false
+    val duration = durationMin ?: 0
+    val endMin = startMin + duration
+    return if (endMin <= 1440) nowMin in startMin until endMin
+    else nowMin >= startMin || nowMin < endMin - 1440
+}
+
+private fun previousWeekday(weekday: Int): Int = ((weekday - 1) + 7) % 7
+
+/** Same wraparound idea as [isCurrentNow], but for a *recurring* routine occurrence: the early-
+ * morning "tail" before [startMin] only counts as still running if the routine actually ran
+ * yesterday too (i.e. its [days] include yesterday's weekday) — a Mon-only routine shouldn't
+ * read as "still running" on a Tuesday morning just because its window happens to cross midnight. */
+internal fun isRoutineCurrentlyRunning(startMin: Int?, durationMin: Int?, nowMin: Int, days: List<Int>, todayWeekday: Int): Boolean {
+    if (startMin == null) return false
+    val duration = durationMin ?: 0
+    val endMin = startMin + duration
+    if (endMin <= 1440) return nowMin in startMin until endMin
+    val tail = endMin - 1440
+    return nowMin >= startMin || (nowMin < tail && days.contains(previousWeekday(todayWeekday)))
+}
+
+/** The item whose scheduled window contains right now gets the "current" accent — matches the
+ * bottom nav's "+" button color. */
+internal fun TodayItem.isHappeningNow(nowMin: Int): Boolean = when (this) {
+    is TodayItem.TaskItem -> isCurrentNow(task.startMin, task.durationMin, nowMin)
+    is TodayItem.RoutineItem -> isRoutineCurrentlyRunning(
+        startMin,
+        block?.durationMin ?: routine.durationMin,
+        nowMin,
+        routine.days,
+        RoutineRepository.currentDayOfWeekIndex()
+    )
+}
+
+internal val TodayItem.isDoneForToday: Boolean
+    get() = when (this) {
+        is TodayItem.TaskItem -> task.done
+        is TodayItem.RoutineItem -> block?.status == "done"
+    }
+
+/** Index, in an already-[buildTodayItems]-sorted list, of the "next up" item — the first
+ * not-yet-done item whose window hasn't started yet. Only meaningful when nothing is currently
+ * happening: once breakfast ends and nothing else is active until evening, the timeline shouldn't
+ * sit fully idle/gray — the next thing coming up (e.g. evening reading) gets the same accent dot
+ * "happening now" items get, so there's always a clear "what's next" pointer. */
+internal fun nextUpIndex(items: List<TodayItem>, nowMin: Int): Int? {
+    if (items.any { it.isHappeningNow(nowMin) }) return null
+    return items.indices.firstOrNull { index ->
+        val item = items[index]
+        val start = item.startMin
+        start != null && start > nowMin && !item.isDoneForToday
+    }
+}
+
+/** Where this item belongs in the timeline's chronological order. Ordinarily just [startMin], but
+ * an overnight routine that's still running from yesterday (see [isRoutineCurrentlyRunning]) sorts
+ * as if it started before midnight rather than at its literal (tonight's) start time — otherwise a
+ * routine like "Sleep 23:00-07:00" would land near the *bottom* of this morning's list, as if it
+ * were hours away, instead of at the top where "already in progress" belongs. */
+private fun TodayItem.sortKey(nowMin: Int, todayWeekday: Int): Int {
+    val start = startMin ?: return Int.MAX_VALUE
+    if (this !is TodayItem.RoutineItem) return start
+    val duration = block?.durationMin ?: routine.durationMin
+    val endMin = start + duration
+    if (endMin <= 1440) return start
+    val tail = endMin - 1440
+    val stillRunningFromYesterday = nowMin < tail && routine.days.contains(previousWeekday(todayWeekday))
+    return if (stillRunningFromYesterday) start - 1440 else start
+}
+
+/** Matches lib/plannerDay.js's dayEntries(): a routine active today (weekday match) shows as a
+ * "virtual" occurrence unless a concrete planner_blocks row already materializes it for today
+ * (that materialized row "wins" so completing/dismissing today never edits the routine). */
+internal fun buildTodayItems(
+    todayTasks: List<Task>,
+    routines: List<PlannerRoutine>,
+    plannerToday: PlannerDayResponse,
+    nowMin: Int
+): List<TodayItem> {
+    val todayStr = LocalDate.now().toString()
+    val weekday = RoutineRepository.currentDayOfWeekIndex()
+    val real = plannerToday.blocks.filter {
+        it.planDate.take(10) == todayStr && it.routineId != null && it.status != "dismissed"
+    }
+    val coveredRoutineIds = real.mapNotNull { it.routineId }.toSet()
+    val materialized = real.mapNotNull { block ->
+        val routine = routines.firstOrNull { it.id == block.routineId } ?: return@mapNotNull null
+        TodayItem.RoutineItem(routine, block)
+    }
+    val virtual = routines
+        .filter { it.active && it.days.contains(weekday) && it.id !in coveredRoutineIds }
+        .map { routine -> TodayItem.RoutineItem(routine, block = null) }
+    val routineItems = materialized + virtual
+    return (todayTasks.map { TodayItem.TaskItem(it) } + routineItems)
+        .sortedWith(compareBy({ it.sortKey(nowMin, weekday) }, { it.title }))
+}
+
+/** The timeline row's cycling background palette — matches the Tasks Section design's BG_CYCLE
+ * under the light theme. Uses [Ink800] rather than the page background's own [Ink950] token so
+ * row tinting stays independent of how dark the page background itself is. */
+internal fun rowBg(index: Int): Color = listOf(Ink700, StreakCard, Ink800, Ink600)[index % 4]
+
+internal enum class RowIcon { TASK, ROUTINE }
+
 /**
- * Ports TasksPanel + TodayCards as one flat, tappable-to-focus task list, plus TasksPanel.js's
- * "Your brain suggests" chips (from /api/mind/queue), its This week/This month due-date
- * groupings, a due-date picker on add, a collapsible "distilled notes" tasks group, overdue
- * styling, and a reminder-driven highlight/glow + scroll-into-view (mirrors pages/work.js's
- * highlightKey). Also mirrors TodayCards.js's cross-device focus poll: tapping a task's focus
- * button while a session for that same task is already running elsewhere jumps straight to the
- * running clock instead of the picker. Simplified vs the web: no drag-to-reorder timeline — that
- * needs a canvas timeline, deferred to a later pass.
+ * Ports the "Tasks Section" design: a header ("TASKS" + pill "See all" button) over a
+ * dot-and-line timeline of today's tasks and routine occurrences. Tapping "See all" opens
+ * [AllTasksScreen] for the full breakdown (this week/this month, completed tasks, full
+ * untruncated titles) — the compact card here only ever shows today's items, capped and with
+ * single-line ellipsized titles, mirroring the design's compact vs. all-tasks split.
  */
 @Composable
-fun TasksPanel(onCompletion: (String) -> Unit, highlightTaskId: String? = null, onHighlightConsumed: () -> Unit = {}) {
+fun TasksPanel(
+    onCompletion: (String) -> Unit,
+    highlightTaskId: String? = null,
+    onHighlightConsumed: () -> Unit = {},
+    onSeeAll: () -> Unit = {}
+) {
     val tasks by TasksRepository.tasks.collectAsState()
     val error by TasksRepository.error.collectAsState()
-    val queueItems by MindQueueRepository.items.collectAsState()
     val routines by PlannerRepository.routines.collectAsState()
     val plannerToday by PlannerRepository.today.collectAsState()
-    var newTitle by remember { mutableStateOf("") }
-    var newDueDate by remember { mutableStateOf<LocalDate?>(null) }
     var focusTask by remember { mutableStateOf<Task?>(null) }
     var focusResume by remember { mutableStateOf<FocusState?>(null) }
     var remoteFocus by remember { mutableStateOf<FocusState?>(null) }
     var glowTaskId by remember { mutableStateOf<String?>(null) }
-    var showDistillTasks by remember { mutableStateOf(false) }
+    var nowMinute by remember { mutableStateOf(currentMinuteOfDay()) }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+
+    // Ticks the "current" accent dot forward as real time passes — without this, a task/routine
+    // entering or leaving its scheduled window would only repaint whenever something unrelated
+    // (tasks, routines, a toggle) happened to trigger a recomposition.
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            nowMinute = currentMinuteOfDay()
+        }
+    }
 
     fun openFocus(task: Task) {
         focusTask = task
         focusResume = remoteFocus?.takeIf { it.active && it.taskId == task.id }
+    }
+
+    // A routine occurrence isn't backed by a real Task row, so it's focused with a blank-id
+    // stand-in — ApiClient.startFocusSession treats a blank id as an untracked session (no task
+    // to attribute it to), which is exactly right for a routine.
+    fun openRoutineFocus(item: TodayItem.RoutineItem) {
+        openFocus(Task(id = "", title = item.routine.title))
+    }
+
+    // Mirrors the task "done" toggle for a routine occurrence: a materialized block is PATCHed
+    // to done/active; a still-virtual occurrence is only materialized (via createBlock) the
+    // moment it's first marked done.
+    fun toggleRoutineDone(item: TodayItem.RoutineItem, done: Boolean) {
+        scope.launch {
+            val block = item.block
+            if (block != null) {
+                PlannerRepository.updateBlock(block.id, UpdatePlannerBlockRequest(status = if (done) "done" else "active"))
+            } else if (done) {
+                PlannerRepository.createBlock(
+                    CreatePlannerBlockRequest(
+                        title = item.routine.title,
+                        planDate = LocalDate.now().toString(),
+                        startMin = item.routine.startMin,
+                        durationMin = item.routine.durationMin,
+                        category = item.routine.category,
+                        routineId = item.routine.id,
+                        status = "done"
+                    )
+                )
+            }
+            if (done) onCompletion("task")
+        }
     }
 
     // Cross-device Pomodoro sync (TodayCards.js): while no dialog of our own is open, poll for a
@@ -150,243 +360,86 @@ fun TasksPanel(onCompletion: (String) -> Unit, highlightTaskId: String? = null, 
         }
     }
 
-    // A reminder's "Open" (NudgesStrip -> WorkScreen) lands here as [highlightTaskId] -- open the
-    // distilled-notes group if that's where the task lives, glow its row briefly, then hand
-    // control back to WorkScreen so a recomposition doesn't replay it.
+    // A reminder's "Open" (NudgesStrip -> WorkScreen) lands here as [highlightTaskId] -- glow its
+    // row briefly, then hand control back to WorkScreen so a recomposition doesn't replay it.
     LaunchedEffect(highlightTaskId) {
         val id = highlightTaskId ?: return@LaunchedEffect
-        if (tasks.any { it.id == id && it.noteId != null }) showDistillTasks = true
         glowTaskId = id
         onHighlightConsumed()
         delay(2500)
         glowTaskId = null
     }
 
-    val suggestions = remember(queueItems) {
-        queueItems.mapNotNull { item -> item.taskSuggestionTitle()?.let { title -> item to title } }
+    val today = remember { LocalDate.now() }
+    val openTasks = remember(tasks) { tasks.filter { !it.done } }
+    val todayTasks = remember(openTasks, today) {
+        openTasks.filter { isTodayTask(it, today) }
     }
-
-    // Matches lib/plannerDay.js's dayEntries(): a routine active today (weekday match) shows as
-    // a "virtual" occurrence unless a concrete planner_blocks row already materializes it for
-    // today (that materialized row "wins" so completing/skipping today never edits the routine).
-    val todayRoutineItems = remember(routines, plannerToday) {
-        val todayStr = LocalDate.now().toString()
-        val weekday = RoutineRepository.currentDayOfWeekIndex()
-        // Matches lib/plannerDay.js's dayEntries() exactly: real = blocks whose status isn't
-        // "dismissed" (that single condition doubles as both "covers the routine, don't show a
-        // virtual placeholder" and "show this materialized card"). A "skipped" block still
-        // covers *and* still shows (TodayCards.js only hides on "dismissed"), matching
-        // components/TodayCards.js's skipRoutine(): a still-virtual occurrence is skipped by
-        // POSTing status "skipped" (POST only accepts active/done/skipped), while skipping an
-        // already-materialized block PATCHes it to "dismissed" — which, quirks included, is
-        // exactly what un-covers it again so a fresh virtual placeholder regenerates next load.
-        val real = plannerToday.blocks.filter {
-            it.planDate.take(10) == todayStr && it.routineId != null && it.status != "dismissed"
-        }
-        val coveredRoutineIds = real.mapNotNull { it.routineId }.toSet()
-        val materialized = real.mapNotNull { block ->
-            val routine = routines.firstOrNull { it.id == block.routineId } ?: return@mapNotNull null
-            TodayItem.RoutineItem(routine, block, virtual = false)
-        }
-        val virtual = routines
-            .filter { it.active && it.days.contains(weekday) && it.id !in coveredRoutineIds }
-            .map { routine -> TodayItem.RoutineItem(routine, block = null, virtual = true) }
-        materialized + virtual
+    // Every one of today's items shows here — no cap. "See all" is for the week/month/drafts/
+    // done breakdown, not for hiding today's own items.
+    val visibleItems = remember(todayTasks, routines, plannerToday, nowMinute) {
+        buildTodayItems(todayTasks, routines, plannerToday, nowMinute)
     }
+    val nextUp = remember(visibleItems, nowMinute) { nextUpIndex(visibleItems, nowMinute) }
 
-    SbCard(topBorderColor = Violet400) {
-        SbLabel("Tasks", color = Violet400)
-        Spacer(Modifier.height(10.dp))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = newTitle,
-                onValueChange = { newTitle = it },
-                placeholder = { Text("Add a task", color = Mist400) },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Violet400.copy(alpha = 0.6f),
-                    unfocusedBorderColor = Ink500,
-                    focusedTextColor = Mist100,
-                    unfocusedTextColor = Mist100,
-                    cursorColor = Violet400
-                )
-            )
-            TextButton(
-                onClick = { pickDate(context, newDueDate ?: LocalDate.now()) { newDueDate = it } },
-                contentPadding = PaddingValues(horizontal = 6.dp)
-            ) {
-                Text(newDueDate?.let { formatDueDate(it.toString()) } ?: "Due date", color = Mist400, style = SecondBrainTypography.bodySmall)
-            }
-            IconButton(onClick = {
-                val title = newTitle.trim()
-                if (title.isNotBlank()) {
-                    newTitle = ""
-                    val due = newDueDate
-                    newDueDate = null
-                    scope.launch { TasksRepository.create(title, dueDate = due?.toString()) }
-                }
-            }) { Icon(Icons.Filled.Add, contentDescription = "Add task", tint = Violet400) }
+    SbCard {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            SbSectionTitle("Tasks", color = StreakAccent)
+            SeeAllButton(onClick = onSeeAll)
         }
+        Spacer(Modifier.height(14.dp))
 
         if (error != null) {
-            Spacer(Modifier.height(8.dp))
             Text(error!!, color = Rose400, style = SecondBrainTypography.bodySmall)
+            Spacer(Modifier.height(8.dp))
         }
 
-        Spacer(Modifier.height(8.dp))
-
-        val open = tasks.filter { !it.done }
-        val done = tasks.filter { it.done }
-        // Matches TasksPanel.js's distillTasks: every task spun off from a distilled note in
-        // Organize, shown as its own collapsible group regardless of where its due date buckets
-        // it (undated ones especially would otherwise be invisible).
-        val distillTasks = remember(tasks) { tasks.filter { it.noteId != null } }
-
-        val today = remember { LocalDate.now() }
-        val weekEnd = remember { today.plusDays(6) }
-        fun dueDateOf(t: Task): LocalDate? = t.dueDate?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-        // Matches TasksPanel.js's weekTasks/monthTasks split: undated/overdue/due-today stays in
-        // the flat "today" list; everything later buckets into exactly one of the two groups
-        // below (so nothing with a due date silently disappears past the month window).
-        val todayTasks = open.filter { val d = dueDateOf(it); d == null || d <= today }
-        val weekTasks = open.filter { val d = dueDateOf(it); d != null && d > today && d <= weekEnd }
-        val monthTasks = open.filter { val d = dueDateOf(it); d != null && d > weekEnd }
-
-        if (distillTasks.isNotEmpty()) {
-            TextButton(onClick = { showDistillTasks = !showDistillTasks }, contentPadding = PaddingValues(horizontal = 4.dp)) {
-                Text(
-                    "${if (showDistillTasks) "Hide" else "Show"} tasks from distilled notes (${distillTasks.size})",
-                    color = Emerald400,
-                    style = SecondBrainTypography.bodySmall
-                )
+        if (visibleItems.isEmpty()) {
+            if (error == null) {
+                Text("No tasks yet — tap + on the nav bar to add one.", color = Mist400, style = SecondBrainTypography.bodySmall)
             }
-            if (showDistillTasks) {
-                Spacer(Modifier.height(4.dp))
-                distillTasks.forEach { task ->
-                    TaskRow(
-                        task = task,
-                        onToggle = {
-                            val willBeDone = !task.done
-                            scope.launch { TasksRepository.setDone(task.id, willBeDone) }
-                            if (willBeDone) onCompletion("task")
-                        },
-                        onFocus = if (!task.done) { { openFocus(task) } } else null,
-                        onDelete = { scope.launch { TasksRepository.delete(task.id) } },
-                        strikethrough = task.done,
-                        highlighted = glowTaskId == task.id,
-                        onSchedule = { date -> scope.launch { TasksRepository.setDueDate(task.id, date.toString()) } }
+        } else {
+            visibleItems.forEachIndexed { index, item ->
+                val isFirst = index == 0
+                val isLast = index == visibleItems.lastIndex
+                val dotColor = if (item.isHappeningNow(nowMinute) || index == nextUp) StreakAccent else StreakSilver
+                when (item) {
+                    is TodayItem.TaskItem -> {
+                        val info = taskSubtitleInfo(item.task)
+                        TimelineRow(
+                            icon = RowIcon.TASK,
+                            title = item.task.title,
+                            subtitle = info.text,
+                            subtitleColor = if (info.overdue) Red400 else Mist300,
+                            bg = rowBg(index),
+                            dotColor = if (glowTaskId == item.task.id) StreakAccent else dotColor,
+                            showLineAbove = !isFirst,
+                            showLineBelow = !isLast,
+                            done = false,
+                            highlighted = glowTaskId == item.task.id,
+                            truncateTitle = true,
+                            onToggle = { scope.launch { TasksRepository.setDone(item.task.id, true); onCompletion("task") } },
+                            onFocus = { openFocus(item.task) },
+                            onDelete = null
+                        )
+                    }
+                    is TodayItem.RoutineItem -> TimelineRow(
+                        icon = RowIcon.ROUTINE,
+                        title = item.routine.title,
+                        subtitle = routineSubtitle(item),
+                        subtitleColor = Mist300,
+                        bg = rowBg(index),
+                        dotColor = dotColor,
+                        showLineAbove = !isFirst,
+                        showLineBelow = !isLast,
+                        done = item.block?.status == "done",
+                        highlighted = false,
+                        truncateTitle = true,
+                        onToggle = { toggleRoutineDone(item, item.block?.status != "done") },
+                        onFocus = { openRoutineFocus(item) },
+                        onDelete = null
                     )
                 }
-            }
-            Spacer(Modifier.height(10.dp))
-        }
-
-        if (tasks.isEmpty() && error == null && todayRoutineItems.isEmpty()) {
-            Text("No tasks yet — add one above.", color = Mist400, style = SecondBrainTypography.bodySmall)
-        }
-
-        // Merged, time-sorted list (routines carry a concrete start_min; undated tasks sort last)
-        // — matches TodayCards.js combining routine occurrences and tasks into one "Today" list.
-        val combinedToday = remember(todayTasks, todayRoutineItems) {
-            (todayTasks.map { TodayItem.TaskItem(it) } + todayRoutineItems)
-                .sortedWith(compareBy({ it.startMin ?: Int.MAX_VALUE }, { it.title }))
-        }
-
-        combinedToday.forEach { item ->
-            when (item) {
-                is TodayItem.TaskItem -> TaskRow(
-                    task = item.task,
-                    onToggle = {
-                        scope.launch {
-                            TasksRepository.setDone(item.task.id, true)
-                            onCompletion("task")
-                        }
-                    },
-                    onFocus = { openFocus(item.task) },
-                    onDelete = { scope.launch { TasksRepository.delete(item.task.id) } },
-                    highlighted = glowTaskId == item.task.id
-                )
-                is TodayItem.RoutineItem -> RoutineTodayRow(
-                    item = item,
-                    onSkipToday = {
-                        scope.launch {
-                            val block = item.block
-                            if (block != null) {
-                                // Matches TodayCards.js's skipRoutine(): an existing block is
-                                // PATCHed to "dismissed", not "skipped".
-                                PlannerRepository.updateBlock(block.id, UpdatePlannerBlockRequest(status = "dismissed"))
-                            } else {
-                                // POST /api/planner only accepts active/done/skipped (not
-                                // "dismissed"), so a still-virtual occurrence being skipped for
-                                // the first time is created straight into "skipped" — matching
-                                // TodayCards.js's skipRoutine() virtual branch exactly.
-                                PlannerRepository.createBlock(
-                                    CreatePlannerBlockRequest(
-                                        title = item.routine.title,
-                                        planDate = LocalDate.now().toString(),
-                                        startMin = item.routine.startMin,
-                                        durationMin = item.routine.durationMin,
-                                        category = item.routine.category,
-                                        routineId = item.routine.id,
-                                        status = "skipped"
-                                    )
-                                )
-                            }
-                        }
-                    }
-                )
-            }
-        }
-
-        if (done.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            SbLabel("Done", color = Mist400)
-            Spacer(Modifier.height(4.dp))
-            done.take(5).forEach { task ->
-                TaskRow(
-                    task = task,
-                    onToggle = { scope.launch { TasksRepository.setDone(task.id, false) } },
-                    onFocus = null,
-                    onDelete = { scope.launch { TasksRepository.delete(task.id) } },
-                    strikethrough = true
-                )
-            }
-        }
-
-        if (suggestions.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            BrainSuggestsSection(suggestions, scope)
-        }
-
-        if (weekTasks.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            SbLabel("This week (${weekTasks.size})", color = Violet400)
-            Spacer(Modifier.height(4.dp))
-            weekTasks.forEach { task ->
-                TaskRow(
-                    task = task,
-                    onToggle = { scope.launch { TasksRepository.setDone(task.id, true); onCompletion("task") } },
-                    onFocus = { openFocus(task) },
-                    onDelete = { scope.launch { TasksRepository.delete(task.id) } },
-                    highlighted = glowTaskId == task.id
-                )
-            }
-        }
-
-        if (monthTasks.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            SbLabel("This month (${monthTasks.size})", color = Violet400)
-            Spacer(Modifier.height(4.dp))
-            monthTasks.forEach { task ->
-                TaskRow(
-                    task = task,
-                    onToggle = { scope.launch { TasksRepository.setDone(task.id, true); onCompletion("task") } },
-                    onFocus = { openFocus(task) },
-                    onDelete = { scope.launch { TasksRepository.delete(task.id) } },
-                    highlighted = glowTaskId == task.id
-                )
             }
         }
     }
@@ -405,176 +458,136 @@ fun TasksPanel(onCompletion: (String) -> Unit, highlightTaskId: String? = null, 
     }
 }
 
-/** A row in the merged "Today" list — either a real task or a routine occurrence (materialized
- * or virtual-for-today), sorted together by [startMin] the same way the web app does. */
-private sealed class TodayItem(val startMin: Int?, val title: String) {
-    class TaskItem(val task: Task) : TodayItem(task.startMin, task.title)
-    class RoutineItem(val routine: PlannerRoutine, val block: PlannerBlock?, val virtual: Boolean) :
-        TodayItem(block?.startMin ?: routine.startMin, routine.title)
-}
-
-private fun formatMinuteOfDay(minute: Int): String {
-    val h = (minute / 60) % 24
-    val m = minute % 60
-    return "%02d:%02d".format(h, m)
-}
-
 @Composable
-private fun RoutineTodayRow(item: TodayItem.RoutineItem, onSkipToday: () -> Unit) {
-    val startMin = item.startMin ?: item.routine.startMin
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(Gold500.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
-        ) { Text("🔁", fontSize = 13.sp) }
-        Spacer(Modifier.width(6.dp))
-        Column(Modifier.weight(1f)) {
-            Text(item.routine.title, color = Mist100, style = SecondBrainTypography.bodyMedium)
-            Text(
-                "${formatMinuteOfDay(startMin)} – ${formatMinuteOfDay(startMin + item.routine.durationMin)}",
-                color = Mist300,
-                style = SecondBrainTypography.bodySmall
-            )
-        }
-        TextButton(onClick = onSkipToday) { Text("Skip today", color = Mist400, style = SecondBrainTypography.bodySmall) }
-    }
-}
-
-@Composable
-private fun BrainSuggestsSection(suggestions: List<Pair<MindQueueItem, String>>, scope: kotlinx.coroutines.CoroutineScope) {
+private fun SeeAllButton(onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Violet400.copy(alpha = 0.05f))
-            .border(BorderStroke(1.dp, Violet400.copy(alpha = 0.3f)), RoundedCornerShape(12.dp))
-            .padding(12.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Mist100)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Column {
-            SbLabel("Your brain suggests", color = Violet400)
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.horizontalScroll(rememberScrollState())) {
-                suggestions.forEach { (item, title) ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(Ink950)
-                            .border(BorderStroke(1.dp, Violet400.copy(alpha = 0.4f)), RoundedCornerShape(50))
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Text(title, color = Mist100, style = SecondBrainTypography.bodySmall)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "✓",
-                            color = Emerald400,
-                            style = SecondBrainTypography.bodyMedium,
-                            modifier = Modifier.clickable { scope.launch { MindQueueRepository.accept(item, title) } }
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            "✕",
-                            color = Mist400,
-                            style = SecondBrainTypography.bodyMedium,
-                            modifier = Modifier.clickable { scope.launch { MindQueueRepository.dismiss(item) } }
-                        )
-                    }
-                }
-            }
-        }
+        Text("See all", color = Ink950, style = SecondBrainTypography.bodySmall, fontWeight = FontWeight.Bold)
     }
 }
+
+/**
+ * A dot-and-line timeline entry: leading icon circle (repeat for routines, bell for one-off
+ * tasks), title + subtitle, an optional focus/play button and an optional round toggle. Shared
+ * by the compact [TasksPanel] card and the full [AllTasksScreen].
+ */
+private val TIMELINE_DOT_OFFSET = 24.dp
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun TaskRow(
-    task: Task,
-    onToggle: () -> Unit,
+internal fun TimelineRow(
+    icon: RowIcon,
+    title: String,
+    subtitle: String,
+    subtitleColor: Color,
+    bg: Color,
+    dotColor: Color,
+    showLineAbove: Boolean,
+    showLineBelow: Boolean,
+    done: Boolean,
+    highlighted: Boolean,
+    truncateTitle: Boolean,
+    onToggle: (() -> Unit)?,
     onFocus: (() -> Unit)?,
-    onDelete: () -> Unit,
-    strikethrough: Boolean = false,
-    highlighted: Boolean = false,
-    // Only the distilled-notes group offers this on web (TasksPanel.js's TaskGroup doesn't pass
-    // onSchedule to This week/This month rows) — undated notes-spun tasks are the ones that
-    // actually need a day picked for them.
-    onSchedule: ((LocalDate) -> Unit)? = null
+    onDelete: (() -> Unit)?
 ) {
-    val context = LocalContext.current
     val requester = remember { BringIntoViewRequester() }
     LaunchedEffect(highlighted) { if (highlighted) requester.bringIntoView() }
-
-    val dueRaw = task.dueDate
-    val dueDateLocal = dueRaw?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-    val overdue = dueDateLocal != null && dueDateLocal < LocalDate.now() && !task.done
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .bringIntoViewRequester(requester)
-            .let {
-                if (highlighted) {
-                    it.clip(RoundedCornerShape(8.dp))
-                        .background(Emerald400.copy(alpha = 0.1f))
-                        .border(BorderStroke(1.dp, Emerald400), RoundedCornerShape(8.dp))
-                } else it
-            }
-            .padding(vertical = 4.dp, horizontal = if (highlighted) 4.dp else 0.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .height(IntrinsicSize.Min)
+            .bringIntoViewRequester(requester),
+        verticalAlignment = Alignment.Top
     ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(pick(CARD_COLORS, task.id).copy(alpha = 0.25f)),
-            contentAlignment = Alignment.Center
-        ) { Text(pick(CARD_ICONS, task.id), fontSize = 13.sp) }
-        Spacer(Modifier.width(6.dp))
-        Checkbox(
-            checked = task.done,
-            onCheckedChange = { onToggle() },
-            colors = CheckboxDefaults.colors(checkedColor = Emerald400)
-        )
-        Column(Modifier.weight(1f)) {
-            Text(
-                task.title,
-                color = if (strikethrough) Mist400 else Mist100,
-                style = SecondBrainTypography.bodyMedium,
-                textDecoration = if (strikethrough) TextDecoration.LineThrough else null
-            )
-            Text(
-                when {
-                    dueDateLocal == null -> "No due date"
-                    overdue -> "overdue: ${formatDueDate(dueRaw)}"
-                    else -> formatDueDate(dueRaw)
-                },
-                color = if (overdue) Red400 else Mist300,
-                style = SecondBrainTypography.bodySmall
-            )
+        // The line above and the line below both stop exactly at this row's own edges — with no
+        // gap between consecutive rows, the line above of row N+1 picks up exactly where row N's
+        // line below ended, so the timeline reads as one continuous stroke through every dot.
+        Column(
+            modifier = Modifier.width(18.dp).fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (showLineAbove) {
+                Box(Modifier.width(2.dp).height(TIMELINE_DOT_OFFSET).background(Ink600))
+            } else {
+                Spacer(Modifier.height(TIMELINE_DOT_OFFSET))
+            }
+            Box(Modifier.size(10.dp).clip(CircleShape).background(dotColor))
+            if (showLineBelow) {
+                Spacer(Modifier.height(2.dp))
+                Box(Modifier.width(2.dp).weight(1f).background(Ink600))
+            }
         }
-        if (onSchedule != null && !task.done) {
-            if (dueDateLocal != LocalDate.now()) {
-                TextButton(onClick = { onSchedule(LocalDate.now()) }, contentPadding = PaddingValues(horizontal = 4.dp)) {
-                    Text("Today", color = Emerald400, style = SecondBrainTypography.bodySmall)
+        Spacer(Modifier.width(8.dp))
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .padding(bottom = 8.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(bg)
+                .then(
+                    if (highlighted) Modifier.border(BorderStroke(1.dp, Emerald400), RoundedCornerShape(16.dp))
+                    else Modifier
+                )
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(if (icon == RowIcon.ROUTINE) Gold500.copy(alpha = 0.2f) else StreakAccent.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) { Text(if (icon == RowIcon.ROUTINE) "🔁" else "🔔", fontSize = 14.sp) }
+
+            Spacer(Modifier.width(10.dp))
+
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    color = if (done) Mist400 else Mist100,
+                    style = SecondBrainTypography.bodyMedium,
+                    textDecoration = if (done) TextDecoration.LineThrough else null,
+                    maxLines = if (truncateTitle) 1 else Int.MAX_VALUE,
+                    overflow = if (truncateTitle) TextOverflow.Ellipsis else TextOverflow.Clip
+                )
+                Text(subtitle, color = subtitleColor, style = SecondBrainTypography.bodySmall)
+            }
+
+            if (onFocus != null) {
+                IconButton(onClick = onFocus) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = "Start focus", tint = Violet400)
                 }
             }
-            IconButton(onClick = { pickDate(context, dueDateLocal ?: LocalDate.now(), onSchedule) }) {
-                Icon(Icons.Filled.DateRange, contentDescription = "Schedule", tint = Mist400)
+            if (onToggle != null) {
+                ToggleCircle(done = done, onClick = onToggle)
+            }
+            if (onDelete != null) {
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Close, contentDescription = "Delete task", tint = Mist400)
+                }
             }
         }
-        if (onFocus != null) {
-            IconButton(onClick = onFocus) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = "Start focus", tint = Violet400)
-            }
-        }
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Filled.Close, contentDescription = "Delete task", tint = Mist400)
-        }
+    }
+}
+
+@Composable
+private fun ToggleCircle(done: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(24.dp)
+            .clip(CircleShape)
+            .background(if (done) StreakAccent else Color.Transparent)
+            .then(if (!done) Modifier.border(BorderStroke(2.dp, Ink500), CircleShape) else Modifier)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        if (done) Text("✓", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }

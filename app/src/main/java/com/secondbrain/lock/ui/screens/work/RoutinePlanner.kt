@@ -50,16 +50,16 @@ import com.secondbrain.lock.network.dto.CreatePlannerRoutineRequest
 import com.secondbrain.lock.network.dto.PlannerRoutine
 import com.secondbrain.lock.network.dto.UpdatePlannerRoutineRequest
 import com.secondbrain.lock.ui.theme.Emerald400
-import com.secondbrain.lock.ui.theme.Gold500
 import com.secondbrain.lock.ui.theme.Ink500
 import com.secondbrain.lock.ui.theme.Ink800
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
 import com.secondbrain.lock.ui.theme.Rose400
-import com.secondbrain.lock.ui.theme.SbCard
 import com.secondbrain.lock.ui.theme.SbLabel
+import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
+import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.Violet400
 import kotlinx.coroutines.launch
 
@@ -106,8 +106,8 @@ fun RoutinePlanner() {
     var routineAnswerBusy by remember { mutableStateOf(false) }
     var editingRoutineId by remember { mutableStateOf<String?>(null) }
 
-    SbCard(topBorderColor = Gold500) {
-        SbLabel("Routines", color = Gold500)
+    StreakSurface {
+        SbSectionTitle("Routines", color = StreakAccent)
         Spacer(Modifier.height(10.dp))
 
         if (error != null) {
@@ -136,11 +136,11 @@ fun RoutinePlanner() {
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Emerald400.copy(alpha = 0.6f),
+                        focusedBorderColor = StreakAccent.copy(alpha = 0.6f),
                         unfocusedBorderColor = Ink500,
                         focusedTextColor = Mist100,
                         unfocusedTextColor = Mist100,
-                        cursorColor = Emerald400
+                        cursorColor = StreakAccent
                     )
                 )
                 Spacer(Modifier.height(6.dp))
@@ -157,7 +157,7 @@ fun RoutinePlanner() {
                         }
                     },
                     enabled = !routineAnswerBusy && routineAnswer.isNotBlank()
-                ) { Text("send to your brain", color = Emerald400) }
+                ) { Text("send to your brain", color = StreakAccent) }
             }
             Spacer(Modifier.height(10.dp))
         }
@@ -283,7 +283,7 @@ private fun RoutineRow(
                 TextButton(onClick = {
                     val duration = editDuration.toIntOrNull()?.coerceAtLeast(15) ?: routine.durationMin
                     onSaveTime(editStartMin, duration)
-                }) { Text("save", color = Emerald400) }
+                }) { Text("save", color = StreakAccent) }
                 TextButton(onClick = onCancelEdit) { Text("cancel", color = Mist400) }
             }
         }
@@ -348,11 +348,11 @@ private fun NewRoutineForm(onCreate: (CreatePlannerRoutineRequest) -> Unit) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Gold500.copy(alpha = 0.6f),
+                focusedBorderColor = StreakAccent.copy(alpha = 0.6f),
                 unfocusedBorderColor = Ink500,
                 focusedTextColor = Mist100,
                 unfocusedTextColor = Mist100,
-                cursorColor = Gold500
+                cursorColor = StreakAccent
             )
         )
         Spacer(Modifier.height(8.dp))
@@ -431,7 +431,7 @@ private fun NewRoutineForm(onCreate: (CreatePlannerRoutineRequest) -> Unit) {
                     title = ""
                 },
                 enabled = title.isNotBlank() && days.isNotEmpty()
-            ) { Text("add", color = Gold500) }
+            ) { Text("add", color = StreakAccent) }
             TextButton(onClick = { open = false }) { Text("cancel", color = Mist400) }
         }
     }

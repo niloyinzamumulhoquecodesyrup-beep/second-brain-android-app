@@ -14,9 +14,13 @@ import com.secondbrain.lock.ui.screens.mind.MindScreen
 import com.secondbrain.lock.ui.screens.mindverse.MindverseScreen
 import com.secondbrain.lock.ui.screens.organize.NoteDetailScreen
 import com.secondbrain.lock.ui.screens.organize.OrganizeScreen
+import com.secondbrain.lock.ui.screens.work.AllTasksScreen
+import com.secondbrain.lock.ui.screens.work.StreakDetailScreen
 import com.secondbrain.lock.ui.screens.work.WorkScreen
 
 private const val NOTE_DETAIL_ROUTE = "note/{noteId}"
+private const val STREAK_DETAIL_ROUTE = "streak"
+private const val ALL_TASKS_ROUTE = "tasks"
 
 /**
  * The 5 top-level tabs, plus a "note/{noteId}" detail route pushed on top from Organize (and
@@ -27,6 +31,7 @@ private const val NOTE_DETAIL_ROUTE = "note/{noteId}"
 fun AppNavHost(
     navController: NavHostController,
     shieldContent: @Composable (PaddingValues) -> Unit,
+    topBar: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues()
 ) {
@@ -41,19 +46,37 @@ fun AppNavHost(
     }
 
     NavHost(navController = navController, startDestination = Destination.WORK.route, modifier = modifier) {
-        composable(Destination.WORK.route) { WorkScreen(contentPadding = contentPadding) }
+        composable(Destination.WORK.route) {
+            WorkScreen(
+                contentPadding = contentPadding,
+                onOpenStreak = { navController.navigate(STREAK_DETAIL_ROUTE) },
+                onOpenAllTasks = { navController.navigate(ALL_TASKS_ROUTE) },
+                topBar = topBar
+            )
+        }
         composable(Destination.ORGANIZE.route) { backStackEntry ->
             val tag by backStackEntry.savedStateHandle.getStateFlow<String?>("tag", null).collectAsState()
             OrganizeScreen(
                 onOpenNote = openNote,
                 tagFilter = tag,
                 onClearTag = { backStackEntry.savedStateHandle["tag"] = null },
-                contentPadding = contentPadding
+                contentPadding = contentPadding,
+                topBar = topBar
             )
         }
-        composable(Destination.MIND.route) { MindScreen(onOpenNote = openNote, contentPadding = contentPadding) }
-        composable(Destination.MINDVERSE.route) { MindverseScreen(contentPadding = contentPadding) }
+        composable(Destination.MIND.route) {
+            MindScreen(onOpenNote = openNote, contentPadding = contentPadding, topBar = topBar)
+        }
+        composable(Destination.MINDVERSE.route) {
+            MindverseScreen(contentPadding = contentPadding, topBar = topBar)
+        }
         composable(Destination.SHIELD.route) { shieldContent(contentPadding) }
+        composable(STREAK_DETAIL_ROUTE) {
+            StreakDetailScreen(onBack = { navController.popBackStack() }, contentPadding = contentPadding)
+        }
+        composable(ALL_TASKS_ROUTE) {
+            AllTasksScreen(onBack = { navController.popBackStack() }, contentPadding = contentPadding)
+        }
         composable(
             route = NOTE_DETAIL_ROUTE,
             arguments = listOf(navArgument("noteId") { type = NavType.StringType })

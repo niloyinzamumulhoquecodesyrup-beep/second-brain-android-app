@@ -6,9 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,31 +14,29 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -48,12 +44,8 @@ import com.secondbrain.lock.data.SecurePrefs
 import com.secondbrain.lock.data.repo.ProfileRepository
 import com.secondbrain.lock.data.repo.RemindersRepository
 import com.secondbrain.lock.network.ApiClient
-import com.secondbrain.lock.network.dto.Reminder
-import com.secondbrain.lock.ui.theme.Emerald400
-import com.secondbrain.lock.ui.theme.GradientText
 import com.secondbrain.lock.ui.theme.Ink500
 import com.secondbrain.lock.ui.theme.Ink700
-import com.secondbrain.lock.ui.theme.Ink950
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Rose400
@@ -65,107 +57,38 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Slim top bar: wordmark + NotificationBell + ThemeToggle + user menu (Settings/Logout).
+ * Slim top bar: logo mark + wordmark, then ThemeToggle + user menu (Settings/Logout).
  *
- * [modifier] is expected to carry the actual glass look (haze blur + tint) from the caller,
- * since that requires a shared HazeState the caller owns — this composable only lays out its
- * own content, it doesn't paint an opaque background of its own.
+ * Scrolls away with the page like any other content — callers place this as the first item in
+ * their own scrollable column rather than pinning it via Scaffold's `topBar` slot, so it carries
+ * no background/blur of its own.
  */
 @Composable
 fun TopBar(onOpenSettings: () -> Unit, onLogout: () -> Unit, modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) {
         launch { ProfileRepository.refresh() }
         while (isActive) {
+            // Kept alive here (rather than in a removed notification-bell UI) since NudgesStrip
+            // on the Work tab reads RemindersRepository.reminders without polling it itself.
             RemindersRepository.refresh()
             delay(60_000)
         }
     }
-    val reminders by RemindersRepository.reminders.collectAsState()
-    val dueReminders = reminders.filter { it.due }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            // No horizontal padding here — callers already place this inside a Column that
+            // applies 16dp of horizontal padding to everything, cards included. Adding it again
+            // here would double-inset the logo/icons past where the cards below actually line up.
+            .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        GradientText("Slay Task", fontSize = 20.sp)
+        Text("Slay Task", color = Mist100, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.weight(1f))
-        NotificationBell(dueReminders)
         ThemeToggle()
+        Spacer(Modifier.width(16.dp))
         UserMenu(onOpenSettings = onOpenSettings, onLogout = onLogout)
-    }
-}
-
-@Composable
-private fun RowScope.NotificationBell(dueReminders: List<Reminder>) {
-    var expanded by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    Box {
-        IconButton(onClick = { expanded = true }) {
-            Icon(
-                if (dueReminders.isNotEmpty()) Icons.Filled.Notifications else Icons.Filled.NotificationsNone,
-                contentDescription = if (dueReminders.isNotEmpty()) "${dueReminders.size} reminders waiting" else "Reminders",
-                tint = Mist300
-            )
-        }
-        // Built by hand rather than Badge/BadgedBox: the default M3 badge sits right at the
-        // IconButton's touch-target edge and gets visually clipped there ("half eaten" circle).
-        // A sibling Box anchored with real padding renders a clean, uncut circle instead.
-        if (dueReminders.isNotEmpty()) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 4.dp, end = 4.dp)
-                    .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
-                    .clip(CircleShape)
-                    .background(Rose400)
-                    .padding(horizontal = 3.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    dueReminders.size.toString(),
-                    color = Ink950,
-                    fontSize = 10.sp,
-                    style = SecondBrainTypography.labelSmall
-                )
-            }
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-        if (dueReminders.isEmpty()) {
-            DropdownMenuItem(text = { Text("Nothing due right now") }, onClick = {}, enabled = false)
-        } else {
-            dueReminders.forEach { reminder ->
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(reminder.message, color = Mist100, style = SecondBrainTypography.bodyMedium)
-                            Spacer(Modifier.width(4.dp))
-                            Row {
-                                if (reminder.kind == "routine_suggestion") {
-                                    TextButton(onClick = {
-                                        scope.launch { RemindersRepository.act(reminder.id, "accept") }
-                                    }) { Text("Accept", color = Emerald400) }
-                                    TextButton(onClick = {
-                                        scope.launch { RemindersRepository.act(reminder.id, "dismiss") }
-                                    }) { Text("Not now", color = Mist300) }
-                                } else {
-                                    TextButton(onClick = {
-                                        scope.launch { RemindersRepository.act(reminder.id, "done") }
-                                    }) { Text("Done", color = Emerald400) }
-                                    TextButton(onClick = {
-                                        scope.launch { RemindersRepository.act(reminder.id, "snooze", 10) }
-                                    }) { Text("Snooze 10m", color = Mist300) }
-                                }
-                            }
-                        }
-                    },
-                    onClick = {}
-                )
-            }
-        }
-        }
     }
 }
 
@@ -173,11 +96,14 @@ private fun RowScope.NotificationBell(dueReminders: List<Reminder>) {
 private fun ThemeToggle() {
     val context = LocalContext.current
     val isLight = SbThemeState.mode == ThemeMode.LIGHT
-    IconButton(onClick = {
-        val next = if (isLight) ThemeMode.DARK else ThemeMode.LIGHT
-        SecurePrefs.setTheme(context, next.storageKey)
-        SbThemeState.mode = next
-    }) {
+    IconButton(
+        onClick = {
+            val next = if (isLight) ThemeMode.DARK else ThemeMode.LIGHT
+            SecurePrefs.setTheme(context, next.storageKey)
+            SbThemeState.mode = next
+        },
+        modifier = Modifier.size(32.dp)
+    ) {
         Icon(
             if (isLight) Icons.Filled.LightMode else Icons.Filled.DarkMode,
             contentDescription = "Toggle theme",
@@ -191,7 +117,7 @@ private fun UserMenu(onOpenSettings: () -> Unit, onLogout: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val profile by ProfileRepository.profile.collectAsState()
 
-    IconButton(onClick = { expanded = true }) {
+    IconButton(onClick = { expanded = true }, modifier = Modifier.size(32.dp)) {
         val p = profile
         if (p?.hasAvatar == true) {
             Box(

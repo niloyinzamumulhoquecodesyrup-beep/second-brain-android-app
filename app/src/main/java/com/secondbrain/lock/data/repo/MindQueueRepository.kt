@@ -1,5 +1,6 @@
 package com.secondbrain.lock.data.repo
 
+import com.secondbrain.lock.data.LocalCache
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.network.dto.MindQueueAnswerRequest
 import com.secondbrain.lock.network.dto.MindQueueItem
@@ -17,17 +18,27 @@ object MindQueueRepository {
     /** Raw pending queue; callers filter with [taskSuggestionTitle] for the create_task subset. */
     val items: StateFlow<List<MindQueueItem>> = _items.asStateFlow()
 
+    suspend fun restore() {
+        LocalCache.load<List<MindQueueItem>>("mind_queue_items")?.let { _items.value = it }
+    }
+
     suspend fun refresh() {
-        ApiClient.getMindQueue().onSuccess { _items.value = it }
+        ApiClient.getMindQueue().onSuccess { _items.value = it; LocalCache.save("mind_queue_items", it) }
     }
 
     suspend fun accept(item: MindQueueItem, title: String): Result<Unit> =
         ApiClient.answerMindQueue(item.id, MindQueueAnswerRequest(action = "create_task", value = MindQueueTaskValue(title)))
-            .onSuccess { _items.value = _items.value.filterNot { it.id == item.id } }
+            .onSuccess {
+                _items.value = _items.value.filterNot { it.id == item.id }
+                LocalCache.save("mind_queue_items", _items.value)
+            }
             .map {}
 
     suspend fun dismiss(item: MindQueueItem): Result<Unit> =
         ApiClient.answerMindQueue(item.id, MindQueueAnswerRequest(action = "skip"))
-            .onSuccess { _items.value = _items.value.filterNot { it.id == item.id } }
+            .onSuccess {
+                _items.value = _items.value.filterNot { it.id == item.id }
+                LocalCache.save("mind_queue_items", _items.value)
+            }
             .map {}
 }
