@@ -114,11 +114,18 @@ fun FocusPomodoroDialog(
         scope.launch { TasksRepository.setPieces(task.id, next) }
     }
 
-    // Mirrors FocusPomodoro.js's onFocusStateChange: closing the dialog mid-session must still
-    // clear the "don't notify me" signal the reminders evaluator reads, same as End early/Finish.
+    // Closing mid-session (X, back, or tapping outside) abandons the session the same way "End
+    // early" does — both cancel the actual /api/focus/state session, not just clear the "don't
+    // notify me" signal the reminders evaluator reads. Without the cancel call, the session stayed
+    // "active" server-side after the dialog closed, so MonitorService's background poll (which
+    // drives the cross-device focus pill) would still report it completed once its original end
+    // time arrived, silently crediting focus minutes for a session the user had actually left.
     fun closeDialog() {
         if (state == FocusUiState.RUNNING) {
-            scope.launch { ApiClient.postFocusState(false, null) }
+            scope.launch {
+                ApiClient.cancelFocusSession()
+                ApiClient.postFocusState(false, null)
+            }
         }
         onDismiss()
     }
@@ -128,10 +135,12 @@ fun FocusPomodoroDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
     ) {
         Box(Modifier.fillMaxSize().fullAuraBackground()) {
-            IconButton(onClick = ::closeDialog, modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
-                Icon(Icons.Filled.Close, contentDescription = "Close", tint = Mist300)
-            }
-
+            // Declared *after* the Column below (both are Box siblings) so it draws on top of —
+            // and, crucially, hit-tests before — the Column's own fillMaxSize()+verticalScroll()
+            // bounds, which otherwise cover this exact corner too and silently swallowed every tap
+            // here: the icon was visible (the Column paints nothing under its own top padding) but
+            // untouchable, since Compose dispatches a tap to whichever sibling is on top, and a
+            // same-size sibling declared later always wins there regardless of what it paints.
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -274,6 +283,10 @@ fun FocusPomodoroDialog(
 
                 Spacer(Modifier.height(40.dp))
                 PiecesSection(pieces = pieces, onPiecesChange = ::updatePieces)
+            }
+
+            IconButton(onClick = ::closeDialog, modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
+                Icon(Icons.Filled.Close, contentDescription = "Close", tint = Mist300)
             }
         }
     }
