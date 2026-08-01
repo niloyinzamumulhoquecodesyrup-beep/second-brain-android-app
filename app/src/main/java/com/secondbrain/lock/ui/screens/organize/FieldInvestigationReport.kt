@@ -65,9 +65,10 @@ import com.secondbrain.lock.ui.theme.Ink800
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
-import com.secondbrain.lock.ui.theme.SbCard
-import com.secondbrain.lock.ui.theme.SbLabel
+import com.secondbrain.lock.ui.screens.work.StreakSurface
+import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
+import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.Violet400
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -80,6 +81,9 @@ import kotlin.math.sin
  * web's 2D dependency graph — flagged), or a MiniBarChart depending on what the insight's
  * metadata carries, else a plain icon+summary. Matches the "For you:", "researched via:",
  * and collapsible Sources rows exactly.
+ * Chrome ported to the Streak Section redesign: a tinted [StreakSurface] card, no icon-chip
+ * bullet, StreakAccent eyebrow title — Gold500/Violet400/Emerald400 stay put where they carry
+ * content meaning (path-node type, concept branch tag, "For you" suggestion).
  */
 @Composable
 fun FieldInvestigationReport(recommendations: List<MindInsight>, onOpenNote: (String) -> Unit) {
@@ -88,9 +92,9 @@ fun FieldInvestigationReport(recommendations: List<MindInsight>, onOpenNote: (St
     val index = page.coerceIn(0, recommendations.size - 1)
     val insight = recommendations[index]
 
-    SbCard(topBorderColor = Gold500) {
+    StreakSurface {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            SbLabel("Field investigation report", color = Gold500)
+            SbSectionTitle("Field investigation report", color = StreakAccent)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { page = (index - 1 + recommendations.size) % recommendations.size }, modifier = Modifier.size(26.dp)) {
                     Text("‹", color = Mist300, fontSize = 18.sp)
@@ -304,7 +308,7 @@ private fun PathList(path: PathInfo) {
 
     Column(Modifier.padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         path.topic?.let {
-            Text(it.uppercase(), color = Gold500, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start))
+            Text(it.uppercase(), color = StreakAccent, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start))
             Spacer(Modifier.height(6.dp))
         }
 

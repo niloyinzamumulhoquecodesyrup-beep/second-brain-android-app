@@ -29,7 +29,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.secondbrain.lock.data.repo.MindverseRepository
-import com.secondbrain.lock.ui.theme.Emerald400
 import com.secondbrain.lock.ui.theme.Ink500
 import com.secondbrain.lock.ui.theme.Ink700
 import com.secondbrain.lock.ui.theme.Mist100
@@ -37,6 +36,7 @@ import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
 import com.secondbrain.lock.ui.theme.Rose400
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
+import com.secondbrain.lock.ui.theme.StreakAccent
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -97,11 +97,11 @@ internal fun ChatComposer(
             singleLine = true,
             modifier = Modifier.weight(1f),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Emerald400.copy(alpha = 0.6f),
+                focusedBorderColor = StreakAccent.copy(alpha = 0.6f),
                 unfocusedBorderColor = Ink500,
                 focusedTextColor = Mist100,
                 unfocusedTextColor = Mist100,
-                cursorColor = Emerald400
+                cursorColor = StreakAccent
             )
         )
         if (showCounter) {
@@ -114,7 +114,7 @@ internal fun ChatComposer(
                 text = ""
                 onSend(trimmed)
             }
-        }) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = Emerald400) }
+        }) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = StreakAccent) }
     }
 }
 

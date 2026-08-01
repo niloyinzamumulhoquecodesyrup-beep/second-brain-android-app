@@ -26,16 +26,15 @@ import com.secondbrain.lock.data.repo.MindverseRepository
 import com.secondbrain.lock.network.dto.JoinRoomResponse
 import com.secondbrain.lock.network.dto.MindcordDomain
 import com.secondbrain.lock.network.dto.MindcordParticipant
-import com.secondbrain.lock.ui.theme.Emerald400
+import com.secondbrain.lock.ui.screens.work.StreakSurface
 import com.secondbrain.lock.ui.theme.Ink500
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
 import com.secondbrain.lock.ui.theme.Rose400
-import com.secondbrain.lock.ui.theme.SbCard
 import com.secondbrain.lock.ui.theme.SbLabel
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
-import com.secondbrain.lock.ui.theme.Violet400
+import com.secondbrain.lock.ui.theme.StreakAccent
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -66,8 +65,8 @@ fun MindcordTab() {
 private fun RoomPicker(domains: List<MindcordDomain>) {
     val scope = rememberCoroutineScope()
 
-    SbCard(topBorderColor = Emerald400) {
-        SbLabel("Join a room", color = Emerald400)
+    StreakSurface {
+        SbLabel("Join a room", color = StreakAccent)
         Spacer(Modifier.height(8.dp))
         Text(
             "Pick a domain to drop into a live text chat with whoever else is studying it right now.",
@@ -95,11 +94,11 @@ private fun RoomRow(domain: MindcordDomain, onJoin: () -> Unit) {
             val live = domain.live?.count ?: 0
             Text(
                 if (live > 0) "$live here now" else "${domain.brains} brains study this",
-                color = if (live > 0) Emerald400 else Mist400,
+                color = if (live > 0) StreakAccent else Mist400,
                 style = SecondBrainTypography.bodySmall
             )
         }
-        TextButton(onClick = onJoin) { Text("Join", color = Emerald400) }
+        TextButton(onClick = onJoin) { Text("Join", color = StreakAccent) }
     }
 }
 
@@ -127,9 +126,9 @@ private fun MindcordRoomView(room: JoinRoomResponse) {
         }
     }
 
-    SbCard(topBorderColor = Violet400) {
+    StreakSurface {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            SbLabel(room.domain, color = Violet400, modifier = Modifier.weight(1f))
+            SbLabel(room.domain, color = StreakAccent, modifier = Modifier.weight(1f))
             TextButton(onClick = { scope.launch { MindverseRepository.leaveRoom() } }) {
                 Text("Leave", color = Rose400, style = SecondBrainTypography.bodySmall)
             }

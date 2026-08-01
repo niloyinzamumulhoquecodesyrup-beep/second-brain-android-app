@@ -1,5 +1,9 @@
 package com.secondbrain.lock.ui.screens.mind
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,11 +15,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -26,16 +29,23 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.secondbrain.lock.data.repo.MindRepository
 import com.secondbrain.lock.data.repo.StatsRepository
-import com.secondbrain.lock.ui.theme.Emerald400
-import com.secondbrain.lock.ui.theme.GradientText
+import com.secondbrain.lock.ui.theme.Ink600
+import com.secondbrain.lock.ui.theme.Ink900
+import com.secondbrain.lock.ui.theme.Ink950
+import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
 import com.secondbrain.lock.ui.theme.SbLabel
+import com.secondbrain.lock.ui.theme.SecondBrainTypography
 import com.secondbrain.lock.ui.theme.fullAuraBackground
 import kotlinx.coroutines.launch
 
@@ -80,8 +90,8 @@ fun MindScreen(
         ) {
             topBar()
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                SbLabel("Mind model", modifier = Modifier.weight(1f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SbLabel("Mind model", color = Mist400, modifier = Modifier.weight(1f))
                 if (syncing) {
                     Text("Syncing…", color = Mist400, fontSize = 10.sp, letterSpacing = 1.sp)
                 } else {
@@ -101,21 +111,9 @@ fun MindScreen(
                 }
             }
             Spacer(Modifier.height(4.dp))
-            Row {
-                GradientText(tab.label, fontSize = 26.sp, modifier = Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(10.dp))
-            Row {
-                MindTab.entries.forEach { candidate ->
-                    FilterChip(
-                        selected = tab == candidate,
-                        onClick = { tab = candidate },
-                        label = { Text(candidate.label) },
-                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Emerald400.copy(alpha = 0.25f))
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
-            }
+            Text(tab.label, color = Mist100, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp)
+            Spacer(Modifier.height(14.dp))
+            MindTabsRow(selected = tab, onSelect = { tab = it })
             Spacer(Modifier.height(16.dp))
 
             when (tab) {
@@ -123,6 +121,40 @@ fun MindScreen(
                 MindTab.LIBRARY -> MindLibraryTab(onOpenNote)
             }
             Spacer(Modifier.height(32.dp))
+        }
+    }
+}
+
+/** Overview/Knowledge Library switcher, ported to the Streak Section redesign's segmented
+ * pill control (see AllTasksScreen.kt's TabsRow) rather than the old Emerald-tinted FilterChips. */
+@Composable
+private fun MindTabsRow(selected: MindTab, onSelect: (MindTab) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(50))
+            .background(Ink900)
+            .border(BorderStroke(1.dp, Ink600), RoundedCornerShape(50))
+            .padding(6.dp)
+    ) {
+        MindTab.entries.forEach { t ->
+            val isSelected = t == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (isSelected) Mist100 else Color.Transparent)
+                    .clickable { onSelect(t) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    t.label,
+                    color = if (isSelected) Ink950 else Mist300,
+                    style = SecondBrainTypography.bodySmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

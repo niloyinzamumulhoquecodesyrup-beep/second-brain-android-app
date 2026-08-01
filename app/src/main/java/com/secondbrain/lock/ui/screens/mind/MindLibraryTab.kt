@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -35,16 +33,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.secondbrain.lock.data.repo.MindRepository
 import com.secondbrain.lock.network.dto.MindLibraryEntry
-import com.secondbrain.lock.ui.theme.Emerald400
+import com.secondbrain.lock.ui.screens.work.StreakSurface
 import com.secondbrain.lock.ui.theme.Gold500
+import com.secondbrain.lock.ui.theme.Ink500
 import com.secondbrain.lock.ui.theme.Ink600
+import com.secondbrain.lock.ui.theme.Ink800
 import com.secondbrain.lock.ui.theme.Ink900
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
-import com.secondbrain.lock.ui.theme.SbCard
 import com.secondbrain.lock.ui.theme.SbLabel
+import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
+import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.Violet400
 
 private val ENTRY_TYPES = listOf("concept", "roadmap", "fact", "method")
@@ -68,7 +69,7 @@ fun MindLibraryTab(onOpenNote: (String) -> Unit) {
     var openEntry by remember { mutableStateOf<MindLibraryEntry?>(null) }
 
     if (library.isEmpty()) {
-        SbCard {
+        StreakSurface {
             Text(
                 "Nothing in the library yet — this fills in as mind cycles run.",
                 color = Mist400,
@@ -98,8 +99,8 @@ fun MindLibraryTab(onOpenNote: (String) -> Unit) {
         }
     }
 
-    SbCard(topBorderColor = Emerald400) {
-        SbLabel("Recently reinforced", color = Emerald400)
+    StreakSurface {
+        SbSectionTitle("Recently reinforced", color = StreakAccent)
         Spacer(Modifier.height(10.dp))
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             recentlyReinforced.forEach { entry ->
@@ -119,35 +120,23 @@ fun MindLibraryTab(onOpenNote: (String) -> Unit) {
 
     Spacer(Modifier.height(10.dp))
     Row(Modifier.horizontalScroll(rememberScrollState())) {
-        FilterChip(
-            selected = typeFilter == null,
-            onClick = { typeFilter = null },
-            label = { Text("All types") },
-            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Violet400.copy(alpha = 0.25f)),
-            modifier = Modifier.padding(end = 6.dp)
-        )
+        MindFilterPill("All types", selected = typeFilter == null, onClick = { typeFilter = null }, modifier = Modifier.padding(end = 6.dp))
         ENTRY_TYPES.forEach { type ->
-            FilterChip(
+            MindFilterPill(
+                type.replaceFirstChar { it.uppercase() },
                 selected = typeFilter == type,
                 onClick = { typeFilter = type },
-                label = { Text(type.replaceFirstChar { it.uppercase() }) },
-                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Violet400.copy(alpha = 0.25f)),
                 modifier = Modifier.padding(end = 6.dp)
             )
         }
     }
     if (domainFilter != null) {
         Spacer(Modifier.height(6.dp))
-        FilterChip(
-            selected = true,
-            onClick = { domainFilter = null },
-            label = { Text("$domainFilter ✕") },
-            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Gold500.copy(alpha = 0.25f))
-        )
+        MindFilterPill("$domainFilter ✕", selected = true, onClick = { domainFilter = null })
     }
 
     Spacer(Modifier.height(12.dp))
-    SbLabel("${domainFilter ?: "Library"} (${filtered.size})", color = Violet400)
+    SbLabel("${domainFilter ?: "Library"} (${filtered.size})", color = StreakAccent)
     Spacer(Modifier.height(8.dp))
     if (filtered.isEmpty()) {
         Text("No entries match.", color = Mist400, style = SecondBrainTypography.bodySmall)
@@ -166,8 +155,8 @@ fun MindLibraryTab(onOpenNote: (String) -> Unit) {
     }
 
     Spacer(Modifier.height(6.dp))
-    SbCard(topBorderColor = Gold500) {
-        SbLabel("Domains", color = Gold500)
+    StreakSurface {
+        SbSectionTitle("Domains", color = StreakAccent)
         Spacer(Modifier.height(8.dp))
         domains.forEach { (domain, count) ->
             val active = domainFilter == domain
@@ -176,7 +165,7 @@ fun MindLibraryTab(onOpenNote: (String) -> Unit) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(6.dp))
                     .clickable { domainFilter = if (active) null else domain }
-                    .background(if (active) Ink600.copy(alpha = 0.4f) else Color.Transparent)
+                    .background(if (active) StreakAccent.copy(alpha = 0.15f) else Color.Transparent)
                     .padding(horizontal = 6.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -215,7 +204,7 @@ private fun LibrarySearchField(value: String, onValueChange: (String) -> Unit) {
             value = value,
             onValueChange = onValueChange,
             textStyle = TextStyle(color = Mist100, fontSize = 13.sp),
-            cursorBrush = androidx.compose.ui.graphics.SolidColor(Emerald400),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(StreakAccent),
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
@@ -224,7 +213,13 @@ private fun LibrarySearchField(value: String, onValueChange: (String) -> Unit) {
 
 @Composable
 private fun LibraryCard(entry: MindLibraryEntry, accent: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    SbCard(modifier = modifier.clickable(onClick = onClick)) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Ink800)
+            .clickable(onClick = onClick)
+            .padding(14.dp)
+    ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(entry.entryType.uppercase(), color = accent, fontSize = 9.sp, style = SecondBrainTypography.labelSmall)
             if (!entry.surfaced) {
@@ -251,5 +246,22 @@ private fun LibraryCard(entry: MindLibraryEntry, accent: Color, modifier: Modifi
         Text("★".repeat(entry.cycleCount.coerceIn(1, 5)) + "☆".repeat(5 - entry.cycleCount.coerceIn(1, 5)), color = Gold500, fontSize = 12.sp)
         Spacer(Modifier.height(4.dp))
         Text(entry.domain, color = Mist400, style = SecondBrainTypography.bodySmall)
+    }
+}
+
+/** Replaces the old Emerald/Violet/Gold-tinted Material3 FilterChips with the Streak Section
+ * redesign's own filter-pill grammar (see RoutinePlanner.kt's category picker): StreakAccent
+ * fill+border when selected, flat Ink800/Ink500 otherwise. */
+@Composable
+private fun MindFilterPill(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) StreakAccent.copy(alpha = 0.2f) else Ink800)
+            .border(BorderStroke(1.dp, if (selected) StreakAccent else Ink500), RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(label, color = if (selected) Mist100 else Mist400, style = SecondBrainTypography.bodySmall)
     }
 }

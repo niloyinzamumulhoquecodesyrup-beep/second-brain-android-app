@@ -43,15 +43,17 @@ import com.secondbrain.lock.network.dto.ParaCounts
 import com.secondbrain.lock.network.dto.SourceRef
 import com.secondbrain.lock.network.dto.Stats
 import com.secondbrain.lock.ui.screens.organize.paraAccent
+import com.secondbrain.lock.ui.screens.work.StreakSurface
 import com.secondbrain.lock.ui.theme.Emerald400
 import com.secondbrain.lock.ui.theme.Gold500
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
 import com.secondbrain.lock.ui.theme.Rose400
-import com.secondbrain.lock.ui.theme.SbCard
 import com.secondbrain.lock.ui.theme.SbLabel
+import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
+import com.secondbrain.lock.ui.theme.StreakAccent
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -81,8 +83,8 @@ fun MindOverviewTab(onOpenNote: (String) -> Unit) {
     RemindersCard(insights?.byKind?.openLoop.orEmpty(), onOpenNote)
 
     Spacer(Modifier.height(16.dp))
-    SbCard(topBorderColor = Emerald400) {
-        SbLabel("Attention patterns", color = Emerald400)
+    StreakSurface {
+        SbSectionTitle("Attention patterns", color = StreakAccent)
         Spacer(Modifier.height(10.dp))
         AttentionChart(stats?.capturesByDay.orEmpty(), insights?.byKind?.attentionPattern?.firstOrNull()?.summary)
     }
@@ -104,7 +106,7 @@ private fun CycleHealthCard(latest: MindCycleRun?) {
         "error" -> Rose400 to "error"
         else -> Emerald400 to "ok"
     }
-    SbCard(topBorderColor = dotColor) {
+    StreakSurface {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(dotColor))
             Spacer(Modifier.width(6.dp))
@@ -151,8 +153,8 @@ private val PARA_LABELS = mapOf(
 @Composable
 private fun WholePictureCard(stats: Stats?, overview: MindInsight?) {
     var showText by remember { mutableStateOf(false) }
-    SbCard(topBorderColor = Emerald400) {
-        SbLabel("The whole picture", color = Emerald400)
+    StreakSurface {
+        SbSectionTitle("The whole picture", color = StreakAccent)
         Spacer(Modifier.height(10.dp))
         if (stats == null) {
             Text("Loading…", color = Mist400, style = SecondBrainTypography.bodySmall)
@@ -256,8 +258,8 @@ private fun RemindersCard(openLoop: List<MindInsight>, onOpenNote: (String) -> U
     val scope = rememberCoroutineScope()
     var added by remember { mutableStateOf(setOf<String>()) }
 
-    SbCard(topBorderColor = Gold500) {
-        SbLabel("Reminders", color = Gold500)
+    StreakSurface {
+        SbSectionTitle("Reminders", color = StreakAccent)
         Spacer(Modifier.height(10.dp))
         if (openLoop.isEmpty()) {
             Text("No reminders right now.", color = Mist400, style = SecondBrainTypography.bodySmall)
@@ -289,7 +291,7 @@ private fun RemindersCard(openLoop: List<MindInsight>, onOpenNote: (String) -> U
                         },
                         enabled = !isAdded
                     ) {
-                        Text(if (isAdded) "✓ added" else "+ add to my day", color = Emerald400, style = SecondBrainTypography.bodySmall)
+                        Text(if (isAdded) "✓ added" else "+ add to my day", color = StreakAccent, style = SecondBrainTypography.bodySmall)
                     }
                 }
             }

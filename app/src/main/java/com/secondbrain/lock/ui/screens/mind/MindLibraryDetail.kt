@@ -52,6 +52,7 @@ import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
+import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.Violet400
 import java.time.Instant
 import java.time.ZoneId
@@ -231,7 +232,7 @@ private fun LibraryPathList(path: PathInfo) {
     var activeId by remember { mutableStateOf<String?>(null) }
     Column(Modifier.padding(top = 8.dp)) {
         path.topic?.let {
-            Text(it.uppercase(), color = Gold500, fontSize = 11.sp)
+            Text(it.uppercase(), color = StreakAccent, fontSize = 11.sp)
             Spacer(Modifier.height(6.dp))
         }
         path.nodes.forEach { node ->

@@ -26,18 +26,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import com.secondbrain.lock.data.repo.MindverseRepository
-import com.secondbrain.lock.ui.theme.GradientText
+import com.secondbrain.lock.ui.screens.work.StreakSurface
 import com.secondbrain.lock.ui.theme.Ink500
-import com.secondbrain.lock.ui.theme.Ink950
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
 import com.secondbrain.lock.ui.theme.Rose400
-import com.secondbrain.lock.ui.theme.SbCard
 import com.secondbrain.lock.ui.theme.SbLabel
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
-import com.secondbrain.lock.ui.theme.Violet400
+import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.fullAuraBackground
 import kotlinx.coroutines.launch
 
@@ -66,10 +65,6 @@ fun MindverseScreen(contentPadding: PaddingValues = PaddingValues(), topBar: @Co
                 )
         ) {
             topBar()
-            Spacer(Modifier.height(8.dp))
-            SbLabel("Cross-account, anonymous")
-            Spacer(Modifier.height(4.dp))
-            GradientText("MINDVERSE", fontSize = 28.sp)
             Spacer(Modifier.height(16.dp))
 
             when {
@@ -89,8 +84,8 @@ private fun PickDisplayNameCard() {
     var saving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    SbCard(topBorderColor = Violet400) {
-        SbLabel("Pick a handle", color = Violet400)
+    StreakSurface {
+        SbLabel("Pick a handle", color = StreakAccent)
         Spacer(Modifier.height(8.dp))
         Text(
             "MINDVERSE is cross-account and anonymous — pick a display name that isn't your email " +
@@ -106,11 +101,11 @@ private fun PickDisplayNameCard() {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Violet400.copy(alpha = 0.6f),
+                focusedBorderColor = StreakAccent.copy(alpha = 0.6f),
                 unfocusedBorderColor = Ink500,
                 focusedTextColor = Mist100,
                 unfocusedTextColor = Mist100,
-                cursorColor = Violet400
+                cursorColor = StreakAccent
             )
         )
         if (error != null) {
@@ -129,7 +124,7 @@ private fun PickDisplayNameCard() {
                 }
             },
             enabled = !saving && name.trim().length >= 2,
-            colors = ButtonDefaults.buttonColors(containerColor = Violet400, contentColor = Ink950)
+            colors = ButtonDefaults.buttonColors(containerColor = StreakAccent, contentColor = Color.White)
         ) { Text("Save") }
     }
 }

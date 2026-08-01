@@ -34,11 +34,12 @@ import com.secondbrain.lock.ui.theme.Emerald400
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
+import com.secondbrain.lock.ui.screens.work.StreakSurface
 import com.secondbrain.lock.ui.theme.Rose400
-import com.secondbrain.lock.ui.theme.SbCard
-import com.secondbrain.lock.ui.theme.SbLabel
+import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
 import com.secondbrain.lock.ui.theme.Sky400
+import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.Violet400
 import kotlin.math.hypot
 import kotlin.math.sqrt
@@ -71,8 +72,8 @@ fun MindKnowledgeGalaxy(
     var fitZoom by remember(layout) { mutableFloatStateOf(1f) }
     var hasFitted by remember(layout) { mutableStateOf(false) }
 
-    SbCard(topBorderColor = Violet400) {
-        SbLabel("Interest cluster", color = Violet400)
+    StreakSurface {
+        SbSectionTitle("Interest cluster", color = StreakAccent)
         Spacer(Modifier.height(4.dp))
         Text("drag to pan · pinch to zoom · tap a lit node", color = Mist400, fontSize = 11.sp)
         Spacer(Modifier.height(10.dp))
@@ -83,7 +84,7 @@ fun MindKnowledgeGalaxy(
                 color = Mist400,
                 style = SecondBrainTypography.bodySmall
             )
-            return@SbCard
+            return@StreakSurface
         }
         val nodes = layout
 
@@ -225,7 +226,7 @@ private fun GalaxyDetailPanel(node: GalaxyNode, onOpenNote: (String) -> Unit, on
             val id = ref.id
             Text(
                 "↳ ${ref.title ?: "note"}",
-                color = Emerald400,
+                color = StreakAccent,
                 fontSize = 11.sp,
                 modifier = if (id != null) Modifier.clickable { onOpenNote(id) } else Modifier
             )

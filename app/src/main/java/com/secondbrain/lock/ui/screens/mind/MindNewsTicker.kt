@@ -29,6 +29,7 @@ import com.secondbrain.lock.ui.theme.Ink900
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Rose400
 import com.secondbrain.lock.ui.theme.Sky400
+import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.Violet400
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.json.JsonArray
@@ -107,10 +108,10 @@ fun MindNewsTicker(items: List<NewsItem>) {
     ) {
         Box(
             modifier = Modifier
-                .background(Emerald400.copy(alpha = 0.1f))
+                .background(StreakAccent.copy(alpha = 0.1f))
                 .padding(horizontal = 10.dp, vertical = 10.dp)
         ) {
-            Text("LATEST", color = Emerald400, fontSize = 11.sp, letterSpacing = 2.sp)
+            Text("LATEST", color = StreakAccent, fontSize = 11.sp, letterSpacing = 2.sp)
         }
         Row(
             modifier = Modifier

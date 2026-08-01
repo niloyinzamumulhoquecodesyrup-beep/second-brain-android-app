@@ -6,10 +6,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -36,11 +39,11 @@ import com.secondbrain.lock.ui.theme.Gold500
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
+import com.secondbrain.lock.ui.screens.work.StreakSurface
 import com.secondbrain.lock.ui.theme.Rose400
-import com.secondbrain.lock.ui.theme.SbCard
-import com.secondbrain.lock.ui.theme.SbLabel
+import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
-import com.secondbrain.lock.ui.theme.Violet400
+import com.secondbrain.lock.ui.theme.StreakAccent
 import kotlin.math.min
 
 private val GOAL_PLATE_COLORS_FALLBACK = listOf(Gold500, Emerald400, Rose400, Mist400, Color(0xFFF0A3C4))
@@ -53,17 +56,20 @@ private val GOAL_PLATE_COLORS_FALLBACK = listOf(Gold500, Emerald400, Rose400, Mi
  * simplified (no chevron arrowhead shaft, banners are a rounded rect + one triangular notch
  * instead of the web's multi-point polygon, no per-pixel SVG parity). Tapping a banner still
  * expands the full summary + sources below, unchanged from before.
+ * Chrome ported to the Streak Section redesign: a tinted [StreakSurface] card, no icon-chip
+ * bullet, and the spine/target motif recolored to StreakAccent as the diagram's own structural
+ * accent — the per-goal banner palette ([GOAL_PLATE_COLORS_FALLBACK]) is untouched.
  */
 @Composable
 fun GoalArrowChart(goals: List<MindInsight>, onOpenNote: (String) -> Unit) {
     var activeId by remember { mutableStateOf<String?>(null) }
 
-    SbCard(topBorderColor = Violet400) {
-        SbLabel("Inferred goals", color = Violet400)
+    StreakSurface {
+        SbSectionTitle("Inferred goals", color = StreakAccent)
         Spacer(Modifier.height(14.dp))
         if (goals.isEmpty()) {
             Text("No goals inferred yet.", color = Mist400, style = SecondBrainTypography.bodySmall)
-            return@SbCard
+            return@StreakSurface
         }
 
         val titles = remember(goals) { goals.map { it.metadataString("name") ?: shortGoalTitle(it.summary) } }
@@ -94,7 +100,7 @@ fun GoalArrowChart(goals: List<MindInsight>, onOpenNote: (String) -> Unit) {
             val targetY = topPadPx + rowHeightPx * goals.size + targetPadDp.toPx() / 2f
 
             drawLine(
-                color = Violet400.copy(alpha = 0.35f),
+                color = StreakAccent.copy(alpha = 0.35f),
                 start = Offset(spineX, topPadPx - 8f),
                 end = Offset(spineX, targetY),
                 strokeWidth = 3f
@@ -170,9 +176,9 @@ fun GoalArrowChart(goals: List<MindInsight>, onOpenNote: (String) -> Unit) {
                 }
             }
 
-            drawCircle(Violet400.copy(alpha = 0.12f), radius = 22.dp.toPx(), center = Offset(spineX, targetY))
-            drawCircle(Violet400.copy(alpha = 0.4f), radius = 14.dp.toPx(), center = Offset(spineX, targetY), style = Stroke(width = 2f))
-            drawCircle(Violet400, radius = 5.dp.toPx(), center = Offset(spineX, targetY))
+            drawCircle(StreakAccent.copy(alpha = 0.12f), radius = 22.dp.toPx(), center = Offset(spineX, targetY))
+            drawCircle(StreakAccent.copy(alpha = 0.4f), radius = 14.dp.toPx(), center = Offset(spineX, targetY), style = Stroke(width = 2f))
+            drawCircle(StreakAccent, radius = 5.dp.toPx(), center = Offset(spineX, targetY))
         }
 
         val activeIndex = goals.indexOfFirst { it.id == activeId }

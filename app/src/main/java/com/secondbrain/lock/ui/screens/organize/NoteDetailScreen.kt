@@ -1,6 +1,7 @@
 package com.secondbrain.lock.ui.screens.organize
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,26 +9,25 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -42,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.secondbrain.lock.data.repo.NotesRepository
@@ -51,17 +53,23 @@ import com.secondbrain.lock.network.dto.Note
 import com.secondbrain.lock.network.dto.NoteLinksResponse
 import com.secondbrain.lock.network.dto.RelatedNote
 import com.secondbrain.lock.network.dto.UpdateNoteRequest
+import com.secondbrain.lock.ui.screens.work.StreakSurface
 import com.secondbrain.lock.ui.theme.Emerald400
 import com.secondbrain.lock.ui.theme.Gold500
 import com.secondbrain.lock.ui.theme.Ink500
+import com.secondbrain.lock.ui.theme.Ink600
+import com.secondbrain.lock.ui.theme.Ink700
+import com.secondbrain.lock.ui.theme.Ink800
+import com.secondbrain.lock.ui.theme.Ink900
 import com.secondbrain.lock.ui.theme.Ink950
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
 import com.secondbrain.lock.ui.theme.Rose400
-import com.secondbrain.lock.ui.theme.SbCard
 import com.secondbrain.lock.ui.theme.SbLabel
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
+import com.secondbrain.lock.ui.theme.StreakAccent
+import com.secondbrain.lock.ui.theme.StreakCard
 import com.secondbrain.lock.ui.theme.Violet400
 import com.secondbrain.lock.ui.theme.fullAuraBackground
 import kotlinx.coroutines.launch
@@ -102,11 +110,9 @@ fun NoteDetailScreen(
                 )
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Mist300)
-                }
-                Spacer(Modifier.width(4.dp))
-                SbLabel("Note")
+                NoteHeaderBackButton(onBack)
+                Spacer(Modifier.width(10.dp))
+                SbLabel("Note", color = Mist400)
                 Spacer(Modifier.weight(1f))
                 if (note != null) {
                     TextButton(onClick = { distilling = !distilling; if (distilling) editing = false }) {
@@ -115,8 +121,8 @@ fun NoteDetailScreen(
                     TextButton(onClick = { editing = !editing; if (editing) distilling = false }) {
                         Text(if (editing) "Cancel" else "Edit", color = Violet400)
                     }
-                    IconButton(onClick = { showDeleteConfirm = true }) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete note", tint = Rose400)
+                    TextButton(onClick = { showDeleteConfirm = true }) {
+                        Text("Delete", color = Rose400)
                     }
                 }
             }
@@ -181,6 +187,21 @@ fun NoteDetailScreen(
     }
 }
 
+/** Matches the "Header back button" pattern from `AllTasksScreen.kt`/`StreakDetailScreen.kt` —
+ * 38dp circle, Ink900 fill, Ink600 border, "←" glyph rather than an icon font. */
+@Composable
+private fun NoteHeaderBackButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(Ink900)
+            .border(BorderStroke(1.dp, Ink600), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { Text("←", color = Mist100, fontSize = 16.sp) }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NoteViewBody(
@@ -194,15 +215,15 @@ private fun NoteViewBody(
     Spacer(Modifier.height(8.dp))
     Row {
         SbLabel(note.para.uppercase(), color = paraAccent(note.para))
-        if (note.distilled) { Spacer(Modifier.width(10.dp)); SbLabel("Distilled", color = Emerald400) }
-        if (note.graduated) { Spacer(Modifier.width(10.dp)); SbLabel("Graduated", color = com.secondbrain.lock.ui.theme.Gold500) }
-        if (note.pinned) { Spacer(Modifier.width(10.dp)); SbLabel("Pinned", color = Violet400) }
+        if (note.distilled) { Spacer(Modifier.width(10.dp)); SbLabel("Distilled", color = Mist400) }
+        if (note.graduated) { Spacer(Modifier.width(10.dp)); SbLabel("Graduated", color = Mist400) }
+        if (note.pinned) { Spacer(Modifier.width(10.dp)); SbLabel("Pinned", color = Mist400) }
     }
 
     note.executiveSummary?.takeIf { it.isNotBlank() }?.let { summary ->
         Spacer(Modifier.height(16.dp))
-        SbCard(topBorderColor = Emerald400) {
-            SbLabel("Executive summary")
+        StreakSurface {
+            SbLabel("Executive summary", color = Mist400)
             Spacer(Modifier.height(8.dp))
             Text(summary, color = Mist100, style = SecondBrainTypography.bodyMedium)
         }
@@ -210,7 +231,7 @@ private fun NoteViewBody(
 
     note.content?.takeIf { it.isNotBlank() }?.let { content ->
         Spacer(Modifier.height(16.dp))
-        SbCard {
+        StreakSurface {
             Text(content, color = Mist100, style = SecondBrainTypography.bodyMedium)
         }
     }
@@ -239,8 +260,8 @@ private fun NoteViewBody(
         // each SbCard's own 20dp padding/border/label was tripling up for what's really one
         // concept (this note's connections), which is what made it feel like it ate the screen.
         Spacer(Modifier.height(16.dp))
-        SbCard {
-            SbLabel("Linked notes", color = Violet400)
+        StreakSurface {
+            SbLabel("Linked notes", color = Mist400)
             if (hasLinks) {
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth()) {
@@ -250,27 +271,84 @@ private fun NoteViewBody(
                 }
             }
             if (related.isNotEmpty()) {
-                Spacer(Modifier.height(if (hasLinks) 10.dp else 8.dp))
+                Spacer(Modifier.height(if (hasLinks) 14.dp else 8.dp))
                 Text("RELATED", color = Mist400, fontSize = 10.sp, style = SecondBrainTypography.labelSmall)
-                Spacer(Modifier.height(4.dp))
-                related.take(5).forEach { r ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onOpenNote(r.id) }
-                            .padding(vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            r.title,
-                            color = Mist100,
-                            style = SecondBrainTypography.bodySmall,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text("${(r.similarity * 100).toInt()}%", color = Mist400, style = SecondBrainTypography.bodySmall)
-                    }
+                Spacer(Modifier.height(8.dp))
+                val shown = related.take(5)
+                shown.forEachIndexed { index, r ->
+                    RelatedNoteRow(
+                        related = r,
+                        bg = noteRowBg(index),
+                        showLineAbove = index != 0,
+                        showLineBelow = index != shown.lastIndex,
+                        onClick = { onOpenNote(r.id) }
+                    )
                 }
             }
+        }
+    }
+}
+
+/** Same 4-color row cycle as `TasksPanel.kt`'s `rowBg()` / `PacketsSection.kt`'s `packetRowBg()`. */
+private fun noteRowBg(index: Int): Color = listOf(Ink700, StreakCard, Ink800, Ink600)[index % 4]
+
+private val NOTE_ROW_DOT_OFFSET = 24.dp
+
+/** A related-note entry restyled into the same dot-and-line-then-pill row as
+ * `PacketsSection.kt`'s `PacketRow` — was a bare clickable title+percentage `Row` before, which
+ * didn't match any of the new row-list styling used elsewhere in Organize. */
+@Composable
+private fun RelatedNoteRow(related: RelatedNote, bg: Color, showLineAbove: Boolean, showLineBelow: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(
+            modifier = Modifier.width(18.dp).fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (showLineAbove) {
+                Box(Modifier.width(2.dp).height(NOTE_ROW_DOT_OFFSET).background(Ink600))
+            } else {
+                Spacer(Modifier.height(NOTE_ROW_DOT_OFFSET))
+            }
+            Box(Modifier.size(10.dp).clip(CircleShape).background(StreakAccent))
+            if (showLineBelow) {
+                Spacer(Modifier.height(2.dp))
+                Box(Modifier.width(2.dp).weight(1f).background(Ink600))
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .padding(bottom = 8.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(bg)
+                .clickable(onClick = onClick)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(36.dp).clip(CircleShape).background(Violet400.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) { Text("🔗", fontSize = 14.sp) }
+
+            Spacer(Modifier.width(10.dp))
+
+            Column(Modifier.weight(1f)) {
+                Text(
+                    related.title,
+                    color = Mist100,
+                    style = SecondBrainTypography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text("${(related.similarity * 100).toInt()}% match", color = Mist300, style = SecondBrainTypography.bodySmall)
+            }
+
+            Spacer(Modifier.width(8.dp))
+            Text("›", color = Mist300, fontSize = 18.sp)
         }
     }
 }

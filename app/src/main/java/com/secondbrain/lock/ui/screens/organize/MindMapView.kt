@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,6 +20,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -33,15 +35,15 @@ import com.secondbrain.lock.data.repo.NotesRepository
 import com.secondbrain.lock.network.dto.NoteGraphEdge
 import com.secondbrain.lock.network.dto.NoteGraphNode
 import com.secondbrain.lock.network.dto.NoteGraphResponse
+import com.secondbrain.lock.ui.screens.work.StreakSurface
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
-import com.secondbrain.lock.ui.theme.SbCard
-import com.secondbrain.lock.ui.theme.SbLabel
+import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SbThemeState
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
+import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.ThemeMode
-import com.secondbrain.lock.ui.theme.Violet400
 import kotlin.math.hypot
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -59,6 +61,9 @@ import kotlin.random.Random
  * titles are shown instead, truncated by width) and the continuous requestAnimationFrame loop
  * (Compose recomposes on state change instead, which is equivalent for a physics sim that only
  * runs once).
+ * Chrome ported to the Streak Section redesign (see RewardPanel/DashboardScreen in
+ * ui/screens/work/): a tinted [StreakSurface] card, no icon-chip bullet, StreakAccent eyebrow
+ * title and CTA — the force-graph's own PARA node/edge palette is untouched.
  */
 @Composable
 fun MindMapView(onOpenNote: (String) -> Unit) {
@@ -79,14 +84,14 @@ fun MindMapView(onOpenNote: (String) -> Unit) {
     var fitZoom by remember(layout) { mutableFloatStateOf(1f) }
     var hasFitted by remember(layout) { mutableStateOf(false) }
 
-    SbCard(topBorderColor = Violet400) {
+    StreakSurface {
         val aiEdgeCount = graph?.edges?.count { it.type == "ai" } ?: 0
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            SbLabel("Mind map", color = Violet400)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            SbSectionTitle("Mind map", color = StreakAccent)
             if (aiEdgeCount > 0) {
                 Text(
                     "AI connections: ${if (showAi) "on" else "off"}",
-                    color = if (showAi) Violet400 else Mist400,
+                    color = if (showAi) StreakAccent else Mist400,
                     fontSize = 11.sp,
                     modifier = Modifier.clickable { showAi = !showAi }
                 )
@@ -218,7 +223,7 @@ fun MindMapView(onOpenNote: (String) -> Unit) {
                             Text(meta, color = Mist400, style = SecondBrainTypography.bodySmall)
                         }
                         Row {
-                            TextButton(onClick = { onOpenNote(node.id) }) { Text("Open note →", color = Violet400) }
+                            TextButton(onClick = { onOpenNote(node.id) }) { Text("Open note →", color = StreakAccent) }
                             TextButton(onClick = { selected = null }) { Text("close", color = Mist400) }
                         }
                     }
