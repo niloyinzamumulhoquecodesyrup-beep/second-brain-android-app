@@ -1,8 +1,9 @@
 package com.secondbrain.lock.ui.screens.organize
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -35,8 +36,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,6 +55,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.secondbrain.lock.data.FeedbackUtil
 import com.secondbrain.lock.network.dto.Note
 import com.secondbrain.lock.ui.screens.work.StreakSurface
 import com.secondbrain.lock.ui.theme.Ink600
@@ -63,6 +68,11 @@ import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
 import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.StreakCard
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.floor
+import kotlin.math.roundToInt
 
 private data class ParaFace(val key: String, val label: String, val empty: String)
 
@@ -82,6 +92,111 @@ private const val SideScale = 0.88f
 private const val SideAlpha = 0.55f
 private val StackEasing = CubicBezierEasing(0.22f, 0.9f, 0.32f, 1f)
 
+// Fraction of an index-unit the drag must cross (or release velocity must clear) to commit to a
+// face change instead of springing back to where it started.
+private const val CommitFractionThreshold = 0.18f
+private const val MinCommitVelocityPxPerSec = 250f
+// A real fidget spinner has near-zero rolling friction, so a flick keeps spinning — rapid ticks
+// at first, gradually spacing out — for a good while before it actually stops, rather than the
+// "abrupt handoff to a snap tween" a normal fling-to-scroll feels like. Coasting in real screen
+// pixels lets a strong flick spin through several full loops of the 4 faces before it lands,
+// exactly like a flicked wheel losing momentum. Lower frictionMultiplier = longer spin.
+private const val SpinFrictionMultiplier = 1.1f
+private const val SpinAbsVelocityThresholdPx = 60f
+private const val MaxPixelVelocity = 20000f
+private const val SettleDurationMs = 220
+
+/** Wraps a continuous reel position into a 0-until-count face index (e.g. -0.6 -> count-1). */
+private fun wrapIndex(position: Float, count: Int): Int {
+    val m = position.roundToInt() % count
+    return if (m < 0) m + count else m
+}
+
+/** Shortest signed circular distance from `position` to `index`, in range (-count/2, count/2]. */
+private fun wrappedOffset(index: Int, position: Float, count: Int): Float {
+    var raw = index - position
+    val half = count / 2f
+    while (raw > half) raw -= count
+    while (raw <= -half) raw += count
+    return raw
+}
+
+/**
+ * Either springs back to the nearest face (drag was too short/slow to count) or, once committed,
+ * coasts like a flicked wheel — real exponential friction in screen-pixel space, converted back
+ * to index units every frame — before a final [settleToNearest] snap onto whichever face the
+ * spin lands closest to. A tick fires on every face-boundary crossed in either phase, so a fast
+ * flick ticks rapidly at first and tapers off as it slows, and a gentle one just ticks once.
+ */
+private suspend fun coastAndSettle(
+    getPosition: () -> Float,
+    setPosition: (Float) -> Unit,
+    releaseVelocityPxPerSec: Float,
+    flapWidthPx: Float,
+    onTick: () -> Unit
+) {
+    val startPosition = getPosition()
+    val nearestStart = startPosition.roundToInt()
+    val fraction = abs(startPosition - nearestStart)
+    val committed = fraction >= CommitFractionThreshold || abs(releaseVelocityPxPerSec) >= MinCommitVelocityPxPerSec
+
+    if (!committed) {
+        settleToNearest(getPosition, setPosition, nearestStart.toFloat(), onTick)
+        return
+    }
+
+    val pixelVelocity = releaseVelocityPxPerSec.coerceIn(-MaxPixelVelocity, MaxPixelVelocity)
+    val decay = Animatable(0f)
+    var lastFloor = floor(startPosition).toInt()
+    decay.animateDecay(
+        pixelVelocity,
+        exponentialDecay(frictionMultiplier = SpinFrictionMultiplier, absVelocityThreshold = SpinAbsVelocityThresholdPx)
+    ) {
+        val newPosition = startPosition + this.value / flapWidthPx
+        setPosition(newPosition)
+        val currentFloor = floor(newPosition).toInt()
+        if (currentFloor != lastFloor) {
+            onTick()
+            lastFloor = currentFloor
+        }
+    }
+
+    settleToNearest(getPosition, setPosition, getPosition().roundToInt().toFloat(), onTick)
+}
+
+/** Final short snap onto [target], ticking if it crosses a face boundary to get there. */
+private suspend fun settleToNearest(
+    getPosition: () -> Float,
+    setPosition: (Float) -> Unit,
+    target: Float,
+    onTick: () -> Unit
+) {
+    val start = getPosition()
+    if (abs(target - start) < 0.001f) return
+    val anim = Animatable(start)
+    var lastFloor = floor(start).toInt()
+    anim.animateTo(target, animationSpec = tween(SettleDurationMs, easing = StackEasing)) {
+        setPosition(this.value)
+        val currentFloor = floor(this.value).toInt()
+        if (currentFloor != lastFloor) {
+            onTick()
+            lastFloor = currentFloor
+        }
+    }
+}
+
+/** Tap-to-activate a visible neighbor flap — always a single step, same tick-on-boundary path. */
+private suspend fun animateToIndex(
+    getPosition: () -> Float,
+    setPosition: (Float) -> Unit,
+    index: Int,
+    count: Int,
+    onTick: () -> Unit
+) {
+    val position = getPosition()
+    settleToNearest(getPosition, setPosition, position + wrappedOffset(index, position, count), onTick)
+}
+
 /**
  * 3D card stack: one card centered, its neighbors peeking from behind at an angle (prev to the
  * left, next to the right), the rest hidden. Tapping a side card brings it to center; the
@@ -99,7 +214,11 @@ fun ParaCubeView(
     onGraduate: (Note) -> Unit,
     onDistill: (Note) -> Unit
 ) {
-    var activeIndex by remember { mutableStateOf(DEFAULT_FACE_INDEX) }
+    var position by remember { mutableFloatStateOf(DEFAULT_FACE_INDEX.toFloat()) }
+    val scope = rememberCoroutineScope()
+    var motionJob by remember { mutableStateOf<Job?>(null) }
+    val context = LocalContext.current
+    val onTick: () -> Unit = { FeedbackUtil.spinTick(context) }
 
     StreakSurface {
         SbSectionTitle("P . A . R . A .", color = StreakAccent)
@@ -110,46 +229,93 @@ fun ParaCubeView(
             Modifier
                 .fillMaxWidth()
                 .height(StackHeight)
-                .pointerInput(FACES.size) {
-                    var dragTotal = 0f
-                    detectHorizontalDragGestures(
-                        onDragStart = { dragTotal = 0f },
-                        onDragEnd = {
-                            val threshold = with(density) { 56.dp.toPx() }
-                            when {
-                                dragTotal <= -threshold -> activeIndex = (activeIndex + 1).coerceAtMost(FACES.lastIndex)
-                                dragTotal >= threshold -> activeIndex = (activeIndex - 1).coerceAtLeast(0)
-                            }
-                            dragTotal = 0f
-                        },
-                        onDragCancel = { dragTotal = 0f }
-                    ) { change, dragAmount ->
-                        change.consume()
-                        dragTotal += dragAmount
-                    }
-                }
         ) {
             val flapWidth = maxWidth * FlapWidthFraction
             val sideOffset = maxWidth * SideOffsetFraction
-            FACES.forEachIndexed { index, face ->
-                Flap3D(
-                    face = face,
-                    offset = index - activeIndex,
-                    flapWidth = flapWidth,
-                    sideOffset = sideOffset,
-                    notes = notes.filter { it.para == face.key },
-                    onActivate = { activeIndex = index },
-                    onOpenNote = onOpenNote,
-                    onMove = onMove,
-                    onGraduate = onGraduate,
-                    onDistill = onDistill,
-                    modifier = Modifier.align(Alignment.Center)
-                )
+            val flapWidthPx = with(density) { flapWidth.toPx() }
+
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(FACES.size, flapWidthPx) {
+                        var lastTickFloor = floor(position).toInt()
+                        // A hand-rolled EMA velocity from the same deltas driving the live drag,
+                        // rather than Compose's VelocityTracker — on-device testing found it
+                        // reliably returning zero for otherwise-clean fast drags on this device.
+                        var velocityPxPerSec = 0f
+                        var lastEventTimeMillis = 0L
+
+                        detectHorizontalDragGestures(
+                            onDragStart = {
+                                motionJob?.cancel()
+                                velocityPxPerSec = 0f
+                                lastEventTimeMillis = 0L
+                                lastTickFloor = floor(position).toInt()
+                            },
+                            onDragEnd = {
+                                val forwardVelocity = velocityPxPerSec
+                                motionJob = scope.launch {
+                                    coastAndSettle(
+                                        getPosition = { position },
+                                        setPosition = { position = it },
+                                        releaseVelocityPxPerSec = forwardVelocity,
+                                        flapWidthPx = flapWidthPx,
+                                        onTick = onTick
+                                    )
+                                }
+                            },
+                            onDragCancel = {
+                                motionJob = scope.launch {
+                                    settleToNearest({ position }, { position = it }, position.roundToInt().toFloat(), onTick)
+                                }
+                            }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            val nowMillis = change.uptimeMillis
+                            if (lastEventTimeMillis != 0L) {
+                                val dtSeconds = (nowMillis - lastEventTimeMillis).coerceAtLeast(1) / 1000f
+                                // Sign-flipped to match the forward-positive convention below:
+                                // dragging left (negative dragAmount) moves the reel forward.
+                                val instVelocity = -dragAmount / dtSeconds
+                                velocityPxPerSec = velocityPxPerSec * 0.7f + instVelocity * 0.3f
+                            }
+                            lastEventTimeMillis = nowMillis
+                            position += -dragAmount / flapWidthPx
+
+                            val currentFloor = floor(position).toInt()
+                            if (currentFloor != lastTickFloor) {
+                                onTick()
+                                lastTickFloor = currentFloor
+                            }
+                        }
+                    }
+            ) {
+                FACES.forEachIndexed { index, face ->
+                    Flap3D(
+                        face = face,
+                        offset = wrappedOffset(index, position, FACES.size),
+                        flapWidth = flapWidth,
+                        sideOffset = sideOffset,
+                        notes = notes.filter { it.para == face.key },
+                        onActivate = {
+                            motionJob?.cancel()
+                            motionJob = scope.launch {
+                                animateToIndex({ position }, { position = it }, index, FACES.size, onTick)
+                            }
+                        },
+                        onOpenNote = onOpenNote,
+                        onMove = onMove,
+                        onGraduate = onGraduate,
+                        onDistill = onDistill,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
         }
 
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            val activeIndex = wrapIndex(position, FACES.size)
             FACES.forEachIndexed { index, _ ->
                 val isActive = index == activeIndex
                 val dotWidth by animateDpAsState(if (isActive) 16.dp else 6.dp, tween(250), label = "dotWidth")
@@ -169,7 +335,7 @@ fun ParaCubeView(
 @Composable
 private fun Flap3D(
     face: ParaFace,
-    offset: Int,
+    offset: Float,
     flapWidth: Dp,
     sideOffset: Dp,
     notes: List<Note>,
@@ -180,36 +346,25 @@ private fun Flap3D(
     onDistill: (Note) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isCenter = offset == 0
-    val isSide = offset == -1 || offset == 1
+    val isCenter = abs(offset) < 0.01f
     val densityScale = LocalDensity.current.density
 
-    val translateX by animateDpAsState(
-        targetValue = when (offset) { -1 -> -sideOffset; 1 -> sideOffset; else -> 0.dp },
-        animationSpec = tween(550, easing = StackEasing),
-        label = "flapX"
-    )
-    val rotation by animateFloatAsState(
-        targetValue = when (offset) { -1 -> SideTiltDeg; 1 -> -SideTiltDeg; else -> 0f },
-        animationSpec = tween(550, easing = StackEasing),
-        label = "flapRotation"
-    )
-    val scale by animateFloatAsState(
-        targetValue = if (isCenter) 1f else SideScale,
-        animationSpec = tween(550, easing = StackEasing),
-        label = "flapScale"
-    )
-    val alpha by animateFloatAsState(
-        targetValue = if (isCenter) 1f else if (isSide) SideAlpha else 0f,
-        animationSpec = tween(500),
-        label = "flapAlpha"
-    )
+    // Position is already driven frame-by-frame by the reel's own Animatable (live drag-follow
+    // or the gear-fling settle), so these are direct continuous formulas rather than a second
+    // layer of animateFloatAsState — a second tween here would fight the reel's own timing.
+    val sideFraction = offset.coerceIn(-1f, 1f)
+    val beyondFraction = (abs(offset) - 1f).coerceIn(0f, 1f)
+
+    val translateX = sideOffset * sideFraction
+    val rotation = -SideTiltDeg * sideFraction
+    val scale = 1f - (1f - SideScale) * abs(sideFraction)
+    val alpha = (1f - (1f - SideAlpha) * abs(sideFraction)) * (1f - beyondFraction)
 
     Box(
         modifier
             .width(flapWidth)
             .fillMaxHeight()
-            .zIndex(if (isCenter) 3f else if (isSide) 2f else 1f)
+            .zIndex(3f - abs(offset).coerceIn(0f, 2f))
             .graphicsLayer {
                 translationX = translateX.toPx()
                 rotationY = rotation
