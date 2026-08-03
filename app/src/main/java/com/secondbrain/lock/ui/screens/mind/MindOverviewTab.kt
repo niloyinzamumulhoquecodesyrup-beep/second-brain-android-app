@@ -90,7 +90,7 @@ fun MindOverviewTab(onOpenNote: (String) -> Unit) {
     }
 
     Spacer(Modifier.height(16.dp))
-    MindKnowledgeGalaxy(
+    InterestClusterCityMap(
         topics = topics,
         goals = insights?.byKind?.inferredGoal.orEmpty(),
         library = library,
