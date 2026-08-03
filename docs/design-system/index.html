@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Second Brain — Android Design System</title>
+<style>
+  :root {
+    --bg: #F4F5F7;
+    --surface: #FFFFFF;
+    --surface-alt: #FAFAFB;
+    --border: #CBD0D4;
+    --border-soft: #E2E5E7;
+    --text: #121B1E;
+    --text-dim: #6D7476;
+    --text-faint: #97A0A2;
+    --accent: #FB4F40;
+    --accent-ink: #FFFFFF;
+    --accent-soft: rgba(251,79,64,0.10);
+    --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+    --radius-card: 16px;
+    --shadow-card: 0 1px 2px rgba(18,27,30,0.04), 0 1px 1px rgba(18,27,30,0.03);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #08090B;
+      --surface: #24343A;
+      --surface-alt: #1B282C;
+      --border: #39474D;
+      --border-soft: #2C3A40;
+      --text: #F4F5F7;
+      --text-dim: rgba(244,245,247,0.66);
+      --text-faint: rgba(244,245,247,0.42);
+      --accent-soft: rgba(251,79,64,0.16);
+      --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 1px 1px rgba(0,0,0,0.2);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #08090B;
+    --surface: #24343A;
+    --surface-alt: #1B282C;
+    --surface-sunken: #17222522;
+    --border: #39474D;
+    --border-soft: #2C3A40;
+    --text: #F4F5F7;
+    --text-dim: rgba(244,245,247,0.66);
+    --text-faint: rgba(244,245,247,0.42);
+    --accent-soft: rgba(251,79,64,0.16);
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 1px 1px rgba(0,0,0,0.2);
+  }
+  :root[data-theme="light"] {
+    --bg: #F4F5F7;
+    --surface: #FFFFFF;
+    --surface-alt: #FAFAFB;
+    --border: #CBD0D4;
+    --border-soft: #E2E5E7;
+    --text: #121B1E;
+    --text-dim: #6D7476;
+    --text-faint: #97A0A2;
+    --accent-soft: rgba(251,79,64,0.10);
+    --shadow-card: 0 1px 2px rgba(18,27,30,0.04), 0 1px 1px rgba(18,27,30,0.03);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent-soft); color: var(--text); }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px;
+  }
+
+  code, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  .shell { display: flex; min-height: 100vh; }
+
+  /* ---------- sidebar ---------- */
+  nav.toc {
+    flex: 0 0 240px;
+    padding: 40px 20px;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid var(--border-soft);
+  }
+  .toc-brand {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 19px;
+    margin-bottom: 4px;
+  }
+  .toc-brand em { font-style: normal; color: var(--accent); }
+  .toc-sub {
+    font-size: 11px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    margin-bottom: 36px;
+  }
+  .toc-list { list-style: none; margin: 0; padding: 0; }
+  .toc-list li { margin-bottom: 2px; }
+  .toc-list a {
+    display: block;
+    color: var(--text-dim);
+    font-size: 13.5px;
+    padding: 7px 10px;
+    border-radius: 7px;
+  }
+  .toc-list a:hover { color: var(--text); background: var(--surface-alt); text-decoration: none; }
+  .toc-num { font-family: var(--mono); font-size: 11px; color: var(--text-faint); margin-right: 8px; }
+
+  /* ---------- main ---------- */
+  main { flex: 1; min-width: 0; padding: 56px 48px 120px; max-width: 980px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1.doc-title {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 40px;
+    letter-spacing: 0.1px;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .lede {
+    font-size: 16px;
+    color: var(--text-dim);
+    max-width: 62ch;
+    margin: 0 0 8px;
+  }
+  .lede + .lede { margin-top: 10px; }
+
+  section { margin-top: 76px; scroll-margin-top: 32px; }
+  section > h2 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 26px;
+    margin: 0 0 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  section > h2 .section-num { font-family: var(--mono); font-size: 14px; color: var(--text-faint); font-weight: 400; }
+  section > .section-intro {
+    font-size: 14.5px;
+    color: var(--text-dim);
+    max-width: 68ch;
+    margin: 0 0 28px;
+  }
+  h3.sub {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 36px 0 14px;
+  }
+  h3.sub:first-of-type { margin-top: 0; }
+
+  code.pathref {
+    background: var(--surface-alt);
+    border: 1px solid var(--border-soft);
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+
+  /* ---------- swatches ---------- */
+  .swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 14px;
+  }
+  .swatch {
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+  }
+  .swatch-faces { display: flex; height: 64px; }
+  .swatch-face { flex: 1; position: relative; }
+  .swatch-face .tag {
+    position: absolute; bottom: 5px; left: 7px;
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.04em;
+    padding: 1px 5px; border-radius: 4px;
+    background: rgba(0,0,0,0.32); color: #fff;
+  }
+  .swatch-body { padding: 10px 12px 12px; }
+  .swatch-name { font-weight: 700; font-size: 13.5px; }
+  .swatch-note { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; line-height: 1.4; }
+  .swatch-hex { display: flex; gap: 10px; margin-top: 7px; font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); }
+  .swatch-flat .swatch-faces { height: 40px; }
+
+  /* ---------- type specimens ---------- */
+  .type-row {
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border-soft);
+  }
+  .type-row:last-child { border-bottom: 1px solid var(--border-soft); }
+  .type-meta {
+    flex: 0 0 168px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    line-height: 1.6;
+    padding-top: 4px;
+  }
+  .type-meta b { display: block; color: var(--text-dim); font-size: 12px; margin-bottom: 2px; }
+  .type-sample { font-family: var(--serif); color: var(--text); }
+  .type-sample.sans { font-family: var(--sans); }
+
+  /* ---------- component demos ---------- */
+  .demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+  .demo-stage {
+    background: var(--surface-alt);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .demo-caption { font-size: 12.5px; color: var(--text-dim); margin-top: 10px; line-height: 1.5; }
+  .demo-caption b { color: var(--text); }
+
+  .sbcard-demo {
+    width: 100%;
+    max-width: 260px;
+    border-radius: 16px;
+    border: 1px solid #39474D;
+    background: #24343A;
+    overflow: hidden;
+  }
+  .sbcard-demo .inner { padding: 20px; }
+  .sbcard-demo .title { color: #FB4F40; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  .sbcard-demo .body { color: #F4F5F7; font-size: 13px; margin-top: 10px; }
+
+  .chip-row { display: flex; gap: 10px; }
+  .chip-demo {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+
+  .pill-demo {
+    display: inline-flex; align-items: center;
+    background: #F4F5F7; color: #08090B;
+    font-weight: 700; font-size: 13px;
+    padding: 9px 20px; border-radius: 999px;
+  }
+
+  /* ---------- screenshot cards ---------- */
+  .shot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; }
+  .shot-card {
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+  }
+  .shot-card img { display: block; width: 100%; height: auto; }
+  .shot-card .cap { padding: 13px 16px 16px; }
+  .shot-card .cap .label { font-weight: 700; font-size: 13px; }
+  .shot-card .cap .note { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; line-height: 1.5; }
+  .theme-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 640px) { .theme-pair { grid-template-columns: 1fr; } }
+  .theme-tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-faint); padding: 8px 16px 0;
+  }
+
+  /* ---------- maturity table ---------- */
+  table.maturity { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.maturity th {
+    text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-faint); font-weight: 700; padding: 0 14px 10px; border-bottom: 1px solid var(--border);
+  }
+  table.maturity td { padding: 14px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  table.maturity tr:last-child td { border-bottom: none; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+    white-space: nowrap;
+  }
+  .status-pill.full { background: rgba(94,234,212,0.16); color: #14B8A6; }
+  .status-pill.partial { background: rgba(224,192,126,0.20); color: #99742B; }
+  .status-pill.base { background: var(--surface-alt); color: var(--text-faint); border: 1px solid var(--border-soft); }
+  @media (prefers-color-scheme: dark) { .status-pill.partial { color: #E0C07E; } }
+  :root[data-theme="dark"] .status-pill.partial { color: #E0C07E; }
+  :root[data-theme="light"] .status-pill.partial { color: #99742B; }
+
+  /* ---------- cheat sheet ---------- */
+  .cheat-wrap { overflow-x: auto; border: 1px solid var(--border-soft); border-radius: 12px; }
+  table.cheat { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 620px; }
+  table.cheat th {
+    position: sticky; top: 0;
+    text-align: left; background: var(--surface-alt);
+    font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--text-faint); font-weight: 700; padding: 10px 14px; border-bottom: 1px solid var(--border);
+  }
+  table.cheat td { padding: 9px 14px; border-bottom: 1px solid var(--border-soft); }
+  table.cheat tr:last-child td { border-bottom: none; }
+  table.cheat td.name { font-weight: 600; }
+  table.cheat td.hex { font-family: var(--mono); color: var(--text-dim); white-space: nowrap; }
+  table.cheat .swatchdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; border: 1px solid rgba(0,0,0,0.15); vertical-align: middle; }
+  table.cheat tbody tr:hover { background: var(--surface-alt); }
+  table.cheat td.usage { color: var(--text-dim); }
+
+  .file-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .file-list li { font-family: var(--mono); font-size: 12.5px; color: var(--text-dim); }
+  .file-list b { color: var(--text); font-family: var(--sans); font-weight: 600; }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 14px 18px;
+    border-radius: 0 10px 10px 0;
+    font-size: 13.5px;
+    color: var(--text);
+    margin: 20px 0;
+  }
+  .callout b { color: var(--accent); }
+
+  footer {
+    margin-top: 90px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-soft);
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  @media (max-width: 860px) {
+    .shell { flex-direction: column; }
+    nav.toc { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border-soft); }
+    main { padding: 40px 22px 100px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="toc">
+    <div class="toc-brand">Slay Task <em>/</em> design</div>
+    <div class="toc-sub">Android reference</div>
+    <ul class="toc-list">
+      <li><a href="#overview"><span class="toc-num">00</span>Overview</a></li>
+      <li><a href="#color"><span class="toc-num">01</span>Color palette</a></li>
+      <li><a href="#type"><span class="toc-num">02</span>Typography</a></li>
+      <li><a href="#components"><span class="toc-num">03</span>Shared components</a></li>
+      <li><a href="#screenshots"><span class="toc-num">04</span>Work tab, live</a></li>
+      <li><a href="#maturity"><span class="toc-num">05</span>Design maturity map</a></li>
+      <li><a href="#cheatsheet"><span class="toc-num">06</span>Token cheat sheet</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <p class="eyebrow">Internal reference — captured 2026-08-01</p>
+    <h1 class="doc-title">The app's actual theme,<br>not a guess at it.</h1>
+    <p class="lede">Every color and type value below is read directly from <code class="pathref">ui/theme/Color.kt</code>, <code class="pathref">Type.kt</code> and <code class="pathref">Components.kt</code> — nothing here is reconstructed from memory. The screenshots in §4 are real captures from the device, not mockups.</p>
+    <p class="lede">Start with §5 if you only need one fact: <b>which screens are actually on the current design</b> before you start matching it.</p>
+
+    <section id="overview">
+      <h2><span class="section-num">00</span>Overview</h2>
+      <p class="section-intro">Three things make this system unusual enough to state up front.</p>
+
+      <div class="callout">
+        <b>1. The theme is manually switched, not OS-driven.</b> Every color in <code class="pathref">Color.kt</code> is a Kotlin property with a live getter branching on <code class="pathref">SbThemeState.mode</code> — the sun/moon icon in the top bar, matching the web app's own toggle. Reading a themed color inside a composable is tracked by Compose's snapshot system, so the whole UI recomposes the instant the toggle flips. <b>Never</b> cache one of these getters in a plain top-level <code>val</code> — it freezes at whichever theme was active on first read and stops updating.
+      </div>
+
+      <div class="callout">
+        <b>2. Light and dark aren't inversions of each other — some tokens change hue, not just lightness.</b> "Emerald400" is teal in dark mode but violet in light mode. "Gold400" is pale champagne in dark mode but rust red in light mode. Assuming a token's dark value is "the same color, just brighter" will be wrong for these two families specifically.
+      </div>
+
+      <div class="callout">
+        <b>3. Two design eras coexist in the same codebase right now.</b> A newer <b style="color:#FB4F40">StreakAccent</b>-led system (flat <code>#FB4F40</code>, tinted cards, icon-chip bullets) exists <b>only</b> in the Work tab and the two screens it pushes to (StreakDetailScreen, AllTasksScreen). Every other screen — Organize, Shield, Mind, Mindverse — still runs the original Emerald-led base theme. Don't assume a screen is "current" just because it uses a shared component like <code>SbCard</code>; check §5.
+      </div>
+    </section>
+
+    <section id="color">
+      <h2><span class="section-num">01</span>Color palette</h2>
+      <p class="section-intro">Every swatch below shows its light face and dark face side by side, read straight from <code class="pathref">ui/theme/Color.kt</code>. Where a family shifts hue between themes (not just lightness), it's called out explicitly.</p>
+
+      <h3 class="sub">Ink — background / surface scale</h3>
+      <div class="swatch-grid" id="sw-ink"></div>
+
+      <h3 class="sub">Mist — text scale</h3>
+      <div class="swatch-grid" id="sw-mist"></div>
+
+      <h3 class="sub">StreakAccent family — the current primary accent (flat, theme-independent)</h3>
+      <div class="swatch-grid" id="sw-streak"></div>
+
+      <h3 class="sub">Emerald — base-theme primary accent <span style="color:var(--accent); font-weight:600;">(hue shifts: teal ↔ violet)</span></h3>
+      <div class="swatch-grid" id="sw-emerald"></div>
+
+      <h3 class="sub">Violet — secondary accent</h3>
+      <div class="swatch-grid" id="sw-violet"></div>
+
+      <h3 class="sub">Gold — tertiary accent <span style="color:var(--accent); font-weight:600;">(hue shifts: champagne ↔ rust red)</span></h3>
+      <div class="swatch-grid" id="sw-gold"></div>
+
+      <h3 class="sub">Status &amp; gauge colors</h3>
+      <div class="swatch-grid" id="sw-status"></div>
+
+      <h3 class="sub">Aura backdrop &amp; nav surface</h3>
+      <div class="swatch-grid" id="sw-aura"></div>
+    </section>
+
+    <section id="type">
+      <h2><span class="section-num">02</span>Typography</h2>
+      <p class="section-intro">A deliberate serif/sans split, defined in <code class="pathref">ui/theme/Type.kt</code>. Display sizes use a system serif standing in for Cormorant Garamond — a real webfont was skipped on purpose so the lock screen still renders fully offline. (This reference doc follows the same logic: no embedded webfont, just a considered system stack.) Every sample below and its caption is a real, grep-verified call site inside the Work-tab family — not a generic reading of <code class="pathref">Type.kt</code>.</p>
+
+      <div class="type-row">
+        <div class="type-meta"><b>displayLarge</b>serif · Light · 40sp<br>letter-spacing 0.2sp</div>
+        <div class="type-sample" style="font-size:40px; font-weight:300; letter-spacing:0.2px;">24:59</div>
+      </div>
+      <div class="demo-caption" style="margin:-8px 0 4px;">FocusPomodoro's countdown ring — the only place it's used, and even there it's <code class="mono">displayLarge.copy(fontSize = 56.sp)</code>, colored Emerald400.</div>
+
+      <div class="type-row">
+        <div class="type-meta"><b>headlineMedium</b>serif · Normal · 24sp</div>
+        <div class="type-sample" style="font-size:24px; font-weight:400;">Write the quarterly report</div>
+      </div>
+      <div class="demo-caption" style="margin:-8px 0 4px;">The task's own title, centered, on FocusPomodoro's "pick a duration" screen.</div>
+
+      <div class="type-row">
+        <div class="type-meta"><b>titleMedium</b>sans · Medium · 16sp</div>
+        <div class="type-sample sans" style="font-size:16px; font-weight:500;">Write the quarterly report</div>
+      </div>
+      <div class="demo-caption" style="margin:-8px 0 4px;">Same task title, once the Pomodoro is actually running — smaller and no longer the sole focus of the screen.</div>
+
+      <div class="type-row">
+        <div class="type-meta"><b>bodyMedium</b>sans · Normal · 14sp</div>
+        <div class="type-sample sans" style="font-size:14px; font-weight:400;">What do you do on a regular basis?</div>
+      </div>
+      <div class="demo-caption" style="margin:-8px 0 4px;">RoutinePlanner's first-run prompt. Also what every routine/task title renders in inside a TimelineRow.</div>
+
+      <div class="type-row">
+        <div class="type-meta"><b>bodySmall</b>sans · Normal · 12sp</div>
+        <div class="type-sample sans" style="font-size:12px; font-weight:400;">No tasks yet — tap + on the nav bar to add one.</div>
+      </div>
+      <div class="demo-caption" style="margin:-8px 0 4px;">TasksPanel's empty state. The most-used style in the whole family — every subtitle, caption, and error line.</div>
+
+      <div class="type-row">
+        <div class="type-meta"><b>labelSmall</b>sans · Medium · 11sp<br>letter-spacing 2sp · via <code class="mono">SbLabel</code></div>
+        <div class="type-sample sans" style="font-size:11px; font-weight:500; letter-spacing:2px; text-transform:uppercase; color:#5EEAD4;">First run</div>
+      </div>
+      <div class="demo-caption" style="margin:-8px 0 4px;">Never called directly — always through <code class="mono">SbLabel(text, color)</code>, which uppercases and applies this style. RoutinePlanner's "First run" shown here; also used for "Focus" (Violet400), "Overdue" (Red400), "Drafts"/"Done" (Mist400).</div>
+
+      <div class="callout" style="margin-top:28px;">
+        <b>Defined but not used anywhere in the Work-tab family:</b> <code class="mono">headlineLarge</code> (30sp — lives only inside <code class="mono">GradientText</code>, which Work never calls), <code class="mono">titleLarge</code> (20sp — Mind/Organize only), <code class="mono">bodyLarge</code> (16sp — not called anywhere in this codebase right now). Don't reach for these three when matching Work's look.
+      </div>
+    </section>
+
+    <section id="components">
+      <h2><span class="section-num">03</span>Shared components</h2>
+      <p class="section-intro">Defined once in <code class="pathref">ui/theme/Components.kt</code>, reused everywhere. Rendered here dark-mode-only for exact-color fidelity (these are Compose reconstructions, not screenshots).</p>
+
+      <div class="demo-grid">
+        <div>
+          <div class="demo-stage">
+            <div class="sbcard-demo" style="background:#1C2A2E; border-color:#1C2A2E; border-radius:24px;">
+              <div class="inner">
+                <div class="title">You're doing great</div>
+                <div class="body">StreakSurface — 24dp radius, flat StreakCard fill, no border. This is the actual card Work uses, not SbCard.</div>
+              </div>
+            </div>
+          </div>
+          <div class="demo-caption"><b>StreakSurface(onClick?)</b> — <code class="pathref">RewardPanel.kt</code>, <code>internal</code>. Backs RewardPanel, NudgesStrip, RoutinePlanner, StreakDetailScreen. <code class="mono">SbCard</code> (Ink900 + border) is <b>not</b> used anywhere in the Work family.</div>
+        </div>
+
+        <div>
+          <div class="demo-stage">
+            <div class="chip-row">
+              <div class="chip-demo" style="background:#24343A;">📚</div>
+              <div class="chip-demo" style="background:#24343A;">✅</div>
+              <div class="chip-demo" style="background:#24343A;">⏱️</div>
+            </div>
+          </div>
+          <div class="demo-caption"><b>StreakIconChip(icon, size, fontSize)</b> — <code class="pathref">RewardPanel.kt</code>. Flat Ink900 circle, no tint — different from the theme-level <code class="mono">SbIconChip</code> (18%-alpha tint), which this family never calls.</div>
+        </div>
+
+        <div>
+          <div class="demo-stage">
+            <div class="chip-demo" style="background:#FB4F40; width:44px; height:44px; color:#fff; font-size:18px;">↗</div>
+          </div>
+          <div class="demo-caption"><b>StreakArrowBadge(size, fontSize)</b> — <code class="pathref">RewardPanel.kt</code>. Solid StreakAccent circle, the "tap for stats" affordance on the streak card.</div>
+        </div>
+
+        <div>
+          <div class="demo-stage">
+            <div class="pill-demo">See all</div>
+          </div>
+          <div class="demo-caption"><b>SeeAllButton</b> — <code class="pathref">TasksPanel.kt</code>, private. Mist100 fill, Ink950 bold text, fully rounded.</div>
+        </div>
+
+        <div>
+          <div class="demo-stage">
+            <div class="chip-row">
+              <div class="chip-demo" style="background:#FB4F40; width:24px; height:24px; color:#fff; font-size:13px; font-weight:700;">✓</div>
+              <div class="chip-demo" style="width:24px; height:24px; border:2px solid #455358;"></div>
+            </div>
+          </div>
+          <div class="demo-caption"><b>ToggleCircle(done)</b> — <code class="pathref">TasksPanel.kt</code>, private. 24dp; solid StreakAccent + white check when done, Ink500-outlined when not. The done/undone toggle on every timeline row.</div>
+        </div>
+
+        <div>
+          <div class="demo-stage" style="flex-direction:column; align-items:flex-start; gap:10px;">
+            <span style="font-size:12px; font-weight:700; letter-spacing:0.14em; color:#FB4F40;">TASKS</span>
+            <span style="font-size:11px; font-weight:500; letter-spacing:2px; color:#5EEAD4;">FIRST RUN</span>
+          </div>
+          <div class="demo-caption"><b>SbSectionTitle</b> (card eyebrow, e.g. "TASKS") vs <b>SbLabel</b> (smaller in-card sub-label, e.g. "First run") — both from <code class="pathref">Components.kt</code>, both genuinely used across the Work family. Bolder/12sp vs medium/11sp.</div>
+        </div>
+
+        <div>
+          <div class="demo-stage">
+            <div style="width:38px; height:38px; border-radius:50%; background:#24343A; border:1px solid #39474D; display:flex; align-items:center; justify-content:center; color:#F4F5F7; font-size:16px;">←</div>
+          </div>
+          <div class="demo-caption"><b>Header back button</b> — 38dp circle, Ink900 fill, Ink600 border, "←" glyph (not an icon font). Shared, inlined pattern in <code class="pathref">AllTasksScreen.kt</code> and <code class="pathref">StreakDetailScreen.kt</code> headers — not a named component in <code class="pathref">Components.kt</code>.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="screenshots">
+      <h2><span class="section-num">04</span>Work tab, live</h2>
+      <p class="section-intro">Real device captures of <code class="pathref">ui/screens/work/</code> — the current-design reference. Not recreations.</p>
+
+      <h3 class="sub">Full tab, both themes</h3>
+      <div class="theme-pair">
+        <div class="shot-card">
+          <span class="theme-tag">Dark</span>
+          <img src="images/work_tab_full_dark.png" alt="Work tab, full screen, dark theme" />
+        </div>
+        <div class="shot-card">
+          <span class="theme-tag">Light</span>
+          <img src="images/work_tab_full_light.png" alt="Work tab, full screen, light theme" />
+        </div>
+      </div>
+
+      <h3 class="sub">Top bar</h3>
+      <div class="theme-pair">
+        <div class="shot-card">
+          <span class="theme-tag">Dark</span>
+          <img src="images/topbar_dark.png" alt="Top bar, dark theme" />
+          <div class="cap"><div class="note">Wordmark left, theme toggle + account avatar right. Scrolls away with content — not pinned via Scaffold's topBar slot. See <code class="pathref">ui/nav/TopBar.kt</code>.</div></div>
+        </div>
+        <div class="shot-card">
+          <span class="theme-tag">Light</span>
+          <img src="images/topbar_light.png" alt="Top bar, light theme" />
+        </div>
+      </div>
+
+      <h3 class="sub">"You're doing great" — RewardPanel</h3>
+      <div class="theme-pair">
+        <div class="shot-card">
+          <span class="theme-tag">Dark</span>
+          <img src="images/reward_panel_dark.png" alt="Reward panel streak card, dark theme" />
+        </div>
+        <div class="shot-card">
+          <span class="theme-tag">Light</span>
+          <img src="images/reward_panel_light.png" alt="Reward panel streak card, light theme" />
+        </div>
+      </div>
+      <div class="shot-card" style="margin-top:16px;">
+        <div class="cap">
+          <div class="label">What to notice</div>
+          <div class="note">Tinted <code class="mono">StreakCard</code> background via <code class="mono">StreakSurface</code> (not plain Ink900) · StreakAccent eyebrow label + progress fill · four <code class="mono">StreakIconChip</code> bullets along the bottom · the round arrow badge is <code class="mono">StreakArrowBadge</code>, solid StreakAccent regardless of theme. Source: <code class="pathref">ui/screens/work/RewardPanel.kt</code>.</div>
+        </div>
+      </div>
+
+      <h3 class="sub">"Tasks" — dot-and-line timeline</h3>
+      <div class="theme-pair">
+        <div class="shot-card">
+          <span class="theme-tag">Dark</span>
+          <img src="images/tasks_panel_dark.png" alt="Tasks panel with timeline rows, dark theme" />
+        </div>
+        <div class="shot-card">
+          <span class="theme-tag">Light</span>
+          <img src="images/tasks_panel_light.png" alt="Tasks panel with timeline rows, light theme" />
+        </div>
+      </div>
+      <div class="shot-card" style="margin-top:16px;">
+        <div class="cap">
+          <div class="label">What to notice</div>
+          <div class="note">Section header pairs <code class="mono">SbSectionTitle</code> with the pill <code class="mono">SeeAllButton</code> · each row alternates background through a 4-color cycle (<code class="mono">rowBg()</code> — cycles Ink700/StreakCard/Ink800/Ink600) so consecutive rows read as distinct without borders · the dot on the vertical line is StreakAccent for "now/next", StreakSilver otherwise. Source: <code class="pathref">ui/screens/work/TasksPanel.kt</code>.</div>
+        </div>
+      </div>
+
+      <h3 class="sub">A single timeline row, close up</h3>
+      <div class="shot-card" style="max-width:460px;">
+        <img src="images/timeline_row_dark.png" alt="Single timeline row close-up, dark theme" />
+        <div class="cap">
+          <div class="note">Leading icon chip (Gold500 tint for a routine, StreakAccent tint for a one-off task) · title + subtitle stacked · a play glyph for "start focus" (tinted Violet400, one of the few surviving non-StreakAccent accents) · trailing round toggle.</div>
+        </div>
+      </div>
+
+      <h3 class="sub">Bottom navigation</h3>
+      <div class="theme-pair">
+        <div class="shot-card">
+          <span class="theme-tag">Dark</span>
+          <img src="images/bottom_nav_dark.png" alt="Bottom navigation bar, dark theme" />
+        </div>
+        <div class="shot-card">
+          <span class="theme-tag">Light</span>
+          <img src="images/bottom_nav_light.png" alt="Bottom navigation bar, light theme" />
+        </div>
+      </div>
+      <div class="shot-card" style="margin-top:16px;">
+        <div class="cap">
+          <div class="label">What to notice</div>
+          <div class="note">Notched pill shape with a concentric-arc cutout for the raised "+" — the selected tab's icon/label and the "+" button are both solid StreakAccent. Bar surface is its own dedicated <code class="mono">NavBarSurface</code> token, not reused Ink900. Shield has no tab here by design — it's reached via the account menu only. Source: <code class="pathref">ui/nav/BottomBar.kt</code>.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="maturity">
+      <h2><span class="section-num">05</span>Design maturity map</h2>
+      <p class="section-intro">Which screens are actually running the current (StreakAccent-led) system versus the original base theme — check this before assuming a screen you're editing already matches Work.</p>
+
+      <table class="maturity">
+        <thead><tr><th>Screen</th><th>Status</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>Work</b><br><code class="pathref">ui/screens/work/*</code></td>
+            <td><span class="status-pill full">● current</span></td>
+            <td>Origin of the redesign. StreakAccent throughout, <code class="mono">StreakSurface</code>'s tinted <code class="mono">StreakCard</code> background, <code class="mono">StreakIconChip</code> bullets, pill buttons, dot-and-line timeline rows.</td>
+          </tr>
+          <tr>
+            <td><b>StreakDetailScreen</b> ("Tap for stats")<br><code class="pathref">ui/screens/work/StreakDetailScreen.kt</code></td>
+            <td><span class="status-pill full">● current</span></td>
+            <td>Pushed from Work's RewardPanel — same current system, not a separate design pass.</td>
+          </tr>
+          <tr>
+            <td><b>AllTasksScreen</b> ("See all")<br><code class="pathref">ui/screens/work/AllTasksScreen.kt</code></td>
+            <td><span class="status-pill full">● current</span></td>
+            <td>Pushed from Work's TasksPanel — same current system, not a separate design pass.</td>
+          </tr>
+          <tr>
+            <td><b>Organize</b><br><code class="pathref">ui/screens/organize/*</code></td>
+            <td><span class="status-pill base">○ old design</span></td>
+            <td>Plain <code class="mono">SbCard</code>, Emerald-led accents. Predates the redesign pass — treat as base theme, not current, regardless of what any earlier note claimed.</td>
+          </tr>
+          <tr>
+            <td><b>Shield</b><br><code class="pathref">DashboardScreen.kt</code></td>
+            <td><span class="status-pill base">○ old design</span></td>
+            <td>Plain <code class="mono">SbCard</code>, no tint. Predates the redesign pass.</td>
+          </tr>
+          <tr>
+            <td><b>Mind / Mindverse</b><br><code class="pathref">ui/screens/mind/*, mindverse/*</code></td>
+            <td><span class="status-pill base">○ old design</span></td>
+            <td>Same — only the shared theme tokens, no section-level redesign pass yet.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="cheatsheet">
+      <h2><span class="section-num">06</span>Token cheat sheet</h2>
+      <p class="section-intro">Every token in <code class="pathref">Color.kt</code>, condensed. <span class="mono" style="color:var(--text-faint);">— </span> means the value is flat (same in both themes).</p>
+
+      <div class="cheat-wrap">
+        <table class="cheat" id="cheat-table">
+          <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Typical use</th></tr></thead>
+          <tbody id="cheat-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <p>Generated from a live device capture + direct reads of <code class="pathref">ui/theme/Color.kt</code>, <code class="pathref">Type.kt</code>, <code class="pathref">Theme.kt</code>, <code class="pathref">Components.kt</code>. Re-run the capture if these files change materially — this page doesn't update itself.</p>
+    </footer>
+  </main>
+</div>
+
+<script>
+  // ---- Palette data, mirrored 1:1 from ui/theme/Color.kt ----
+  const PALETTE = {
+    ink: [
+      ["Ink950","Page background","#F4F5F7","#08090B"],
+      ["Ink900","Card surface","#FFFFFF","#24343A"],
+      ["Ink800","Alt row / surfaceVariant","#FAFAFB","#1B282C"],
+      ["Ink700","Border / progress track","#ECEDED","#3D4B51"],
+      ["Ink600","Card border","#CBD0D4","#39474D"],
+      ["Ink500","Outline","#B8BCBF","#455358"],
+    ],
+    mist: [
+      ["Mist100","Primary text","#121B1E","#F4F5F7"],
+      ["Mist300","Secondary text","#6D7476","#F4F5F7 @62%"],
+      ["Mist400/500","Tertiary / dim text","#121B1E @42%","#F4F5F7 @40%"],
+    ],
+    streak: [
+      ["StreakAccent","Current primary accent","#FB4F40","#FB4F40"],
+      ["StreakCard","Tinted hero-card bg","#D9E6E9","#1C2A2E"],
+      ["StreakSilver","Neutral/inactive accent","#8C8E8F","#8C8E8F"],
+      ["StreakCallisto","—","#CBD0D4","#CBD0D4"],
+    ],
+    emerald: [
+      ["Emerald400","Pomodoro countdown · day-selector chips · “First run” label","#6D57BC","#5EEAD4"],
+      ["Emerald500","not used in Work","#5843A7","#2DD4BF"],
+      ["Emerald600","not used in Work","#49378A","#14B8A6"],
+    ],
+    violet: [
+      ["Violet400","Focus ▶ icon tint · “from your brain” tag","#506B82","#B7A6F7"],
+      ["Violet500","not used in Work","#405669","#A78BFA"],
+      ["Violet600","not used in Work","#354756","#8B6EF2"],
+    ],
+    gold: [
+      ["Gold400","not used in Work (Gold500 is)","#BD382C","#F0D9A3"],
+      ["Gold500","Routine category dot/icon tint · CompletionCelebration ring","#992D24","#E0C07E"],
+    ],
+    status: [
+      ["Rose400","Error text · RoutinePlanner's “delete” action","#D1264F","#FB7185"],
+      ["Rose500","not used in Work","#881337","#F43F5E"],
+      ["Red400","Overdue-task subtitle text","#B91C1C","#F87171"],
+      ["Orange400","not used anywhere in this codebase right now","#C2410C","#FB923C"],
+      ["Sky400","Mind tab's “technology” topic color — not Work","#0369A1","#7DD3FC"],
+    ],
+    aura: [
+      ["Aura1","Radial-glow layer 1 (fullAuraBackground)","#506B82","#A78BFA"],
+      ["Aura2","Radial-glow layer 2 (fullAuraBackground)","#BD382C","#E0C07E"],
+      ["Aura3","Radial-glow layer 3 (fullAuraBackground)","#6D57BC","#2DD4BF"],
+      ["NavBarSurface","Bottom nav bg — ui/nav/BottomBar.kt, shared chrome not Work-specific","#D9E6E9","#121B1E"],
+    ],
+  };
+
+  function renderSwatchGroup(id, rows) {
+    const el = document.getElementById(id);
+    el.innerHTML = rows.map(([name, note, light, dark]) => {
+      const flat = light === dark;
+      return `<div class="swatch${flat ? ' swatch-flat' : ''}">
+        <div class="swatch-faces">
+          <div class="swatch-face" style="background:${light.split(' ')[0]}"><span class="tag">L</span></div>
+          ${flat ? '' : `<div class="swatch-face" style="background:${dark.split(' ')[0]}"><span class="tag">D</span></div>`}
+        </div>
+        <div class="swatch-body">
+          <div class="swatch-name">${name}</div>
+          <div class="swatch-note">${note}</div>
+          <div class="swatch-hex"><span>${light}</span>${flat ? '' : `<span>${dark}</span>`}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  renderSwatchGroup('sw-ink', PALETTE.ink);
+  renderSwatchGroup('sw-mist', PALETTE.mist);
+  renderSwatchGroup('sw-streak', PALETTE.streak);
+  renderSwatchGroup('sw-emerald', PALETTE.emerald);
+  renderSwatchGroup('sw-violet', PALETTE.violet);
+  renderSwatchGroup('sw-gold', PALETTE.gold);
+  renderSwatchGroup('sw-status', PALETTE.status);
+  renderSwatchGroup('sw-aura', PALETTE.aura);
+
+  const cheatBody = document.getElementById('cheat-body');
+  const allRows = [].concat(...Object.values(PALETTE));
+  cheatBody.innerHTML = allRows.map(([name, note, light, dark]) => {
+    const dot = light.split(' ')[0];
+    return `<tr>
+      <td class="name"><span class="swatchdot" style="background:${dot}"></span>${name}</td>
+      <td class="hex">${light}</td>
+      <td class="hex">${light === dark ? '—' : dark}</td>
+      <td class="usage">${note}</td>
+    </tr>`;
+  }).join('');
+</script>
+</body>
+</html>

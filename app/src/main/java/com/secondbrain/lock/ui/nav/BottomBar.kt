@@ -42,8 +42,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.secondbrain.lock.R
-import com.secondbrain.lock.ui.theme.Ink900
 import com.secondbrain.lock.ui.theme.Mist300
+import com.secondbrain.lock.ui.theme.NavBarSurface
 import com.secondbrain.lock.ui.theme.SbThemeState
 import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.ThemeMode
@@ -92,7 +92,7 @@ fun BottomBar(navController: NavHostController, onAddClick: () -> Unit, modifier
 
     Box(modifier.fillMaxWidth()) {
         NavigationBar(
-            containerColor = Ink900,
+            containerColor = NavBarSurface,
             tonalElevation = 0.dp,
             modifier = Modifier
                 .fillMaxWidth()

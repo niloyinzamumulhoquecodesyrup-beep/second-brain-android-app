@@ -10,6 +10,7 @@ import coil.Coil
 import coil.ImageLoader
 import com.secondbrain.lock.data.LocalCache
 import com.secondbrain.lock.data.SecurePrefs
+import com.secondbrain.lock.data.SyncQueue
 import com.secondbrain.lock.data.repo.MindQueueRepository
 import com.secondbrain.lock.data.repo.MindRepository
 import com.secondbrain.lock.data.repo.MindverseRepository
@@ -33,6 +34,7 @@ class LockApp : Application() {
         ApiClient.init(this)
         Overlays.init(this)
         LocalCache.init(this)
+        SyncQueue.init(this)
         // Local-first: every repository's last-saved data is loaded into memory before the first
         // screen composes, so the UI shows it immediately (even if stale) instead of a blank
         // state while each screen's own network refresh() is still in flight. These are just a
@@ -49,6 +51,10 @@ class LockApp : Application() {
             StatsRepository.restore()
             TasksRepository.restore()
         }
+        // Runs immediately if a network is already up, or waits for one via WorkManager's
+        // NetworkType.CONNECTED constraint — replays anything SyncQueue queued last session while
+        // offline (task creates/edits, focus-activity logs) that never made it to the server.
+        SyncQueue.scheduleFlush()
         // Reuses ApiClient's OkHttp client (bearer-token interceptor included) so any AsyncImage
         // pointed at an authenticated endpoint like /api/auth/avatar just works.
         Coil.setImageLoader(ImageLoader.Builder(this).okHttpClient(ApiClient.client).build())

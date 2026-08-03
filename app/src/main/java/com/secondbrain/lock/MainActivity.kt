@@ -41,12 +41,13 @@ import com.secondbrain.lock.data.SleepPrefs
 import com.secondbrain.lock.data.repo.ProfileRepository
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.service.MonitorService
+import com.secondbrain.lock.ui.nav.ACCOUNT_SETTINGS_ROUTE
 import com.secondbrain.lock.ui.nav.AppNavHost
 import com.secondbrain.lock.ui.nav.BottomBar
-import com.secondbrain.lock.ui.nav.Destination
 import com.secondbrain.lock.ui.nav.QuickAddChooserSheet
 import com.secondbrain.lock.ui.nav.QuickAddTaskSheet
 import com.secondbrain.lock.ui.nav.TopBar
+import com.secondbrain.lock.ui.screens.AccountSettingsScreen
 import com.secondbrain.lock.ui.screens.AddAppScreen
 import com.secondbrain.lock.ui.screens.DashboardRow
 import com.secondbrain.lock.ui.screens.DashboardScreen
@@ -109,20 +110,23 @@ private fun RootApp() {
     }
 
     val navController = rememberNavController()
+    // Shared by the normal logout menu item and a successful account deactivation — both end
+    // the session locally the same way.
+    val onLogout: () -> Unit = {
+        ApiClient.logout()
+        ProfileRepository.clear()
+        // A different account may log in next on this device — don't let its first
+        // launch flash the previous account's cached data before its own refresh lands.
+        scope.launch { LocalCache.clearAll() }
+        authToken = null
+    }
     // Built once and threaded down to every top-level tab so each one renders it as the first
     // item in its own scrollable column — it scrolls away with the page instead of staying
     // pinned.
     val topBar: @Composable () -> Unit = {
         TopBar(
-            onOpenSettings = { navController.navigate(Destination.SHIELD.route) },
-            onLogout = {
-                ApiClient.logout()
-                ProfileRepository.clear()
-                // A different account may log in next on this device — don't let its first
-                // launch flash the previous account's cached data before its own refresh lands.
-                scope.launch { LocalCache.clearAll() }
-                authToken = null
-            }
+            onOpenSettings = { navController.navigate(ACCOUNT_SETTINGS_ROUTE) },
+            onLogout = onLogout
         )
     }
 
@@ -138,6 +142,13 @@ private fun RootApp() {
             AppNavHost(
                 navController = navController,
                 shieldContent = { shieldPadding -> SettingsFlow(shieldPadding, topBar) },
+                accountSettingsContent = { accountPadding ->
+                    AccountSettingsScreen(
+                        onBack = { navController.popBackStack() },
+                        onDeactivated = onLogout,
+                        contentPadding = accountPadding
+                    )
+                },
                 topBar = topBar,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = padding

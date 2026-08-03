@@ -409,7 +409,7 @@ fun TasksPanel(
                         TimelineRow(
                             icon = RowIcon.TASK,
                             title = item.task.title,
-                            subtitle = info.text,
+                            subtitle = if (item.task.pendingSync) "Syncing… · ${info.text}" else info.text,
                             subtitleColor = if (info.overdue) Red400 else Mist300,
                             bg = rowBg(index),
                             dotColor = if (glowTaskId == item.task.id) StreakAccent else dotColor,
@@ -418,7 +418,7 @@ fun TasksPanel(
                             done = false,
                             highlighted = glowTaskId == item.task.id,
                             truncateTitle = true,
-                            onToggle = { scope.launch { TasksRepository.setDone(item.task.id, true); onCompletion("task") } },
+                            onToggle = { scope.launch { TasksRepository.setDone(item.task.id, true).onSuccess { onCompletion("task") } } },
                             onFocus = { openFocus(item.task) },
                             onDelete = null
                         )

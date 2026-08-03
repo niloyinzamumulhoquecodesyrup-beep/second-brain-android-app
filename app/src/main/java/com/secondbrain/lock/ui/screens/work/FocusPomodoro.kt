@@ -49,6 +49,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.secondbrain.lock.data.FocusState
+import com.secondbrain.lock.data.PendingOp
+import com.secondbrain.lock.data.SyncQueue
 import com.secondbrain.lock.data.repo.StatsRepository
 import com.secondbrain.lock.data.repo.TasksRepository
 import com.secondbrain.lock.network.ApiClient
@@ -64,6 +66,8 @@ import com.secondbrain.lock.ui.theme.SbLabel
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
 import com.secondbrain.lock.ui.theme.Violet400
 import com.secondbrain.lock.ui.theme.fullAuraBackground
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -114,17 +118,71 @@ fun FocusPomodoroDialog(
         scope.launch { TasksRepository.setPieces(task.id, next) }
     }
 
+    // Recomputed from endsAtMillis/System.currentTimeMillis() (not the ticked remainingMs state)
+    // so it's correct even if this fires before RunningFocusTimer's first tick has landed.
+    fun elapsedFocusMinutes(): Int {
+        val remaining = endsAtMillis - System.currentTimeMillis()
+        val elapsedMs = (minutes * 60_000L) - remaining
+        return (elapsedMs / 60_000L).toInt().coerceAtLeast(0)
+    }
+
+    // Attempts the log directly (covers both "always been online" and "started offline but back
+    // online by now"); only on failure does it fall back to SyncQueue, covering "still offline" —
+    // one path for every connectivity shape instead of branching on how the session started.
+    // sessionId is deliberately NOT queued/resent here: it only ever identifies a *server-known*
+    // session (null for one that was started locally, see the offline branch of "Start focus"
+    // below), and the queued retry has no server session to correlate against either way.
+    fun logFocusActivity(elapsedMinutes: Int) {
+        if (elapsedMinutes < 1) return
+        // Deliberately NOT `scope` (rememberCoroutineScope()): every caller of this — "End early",
+        // the X/back close path, natural completion — dismisses the dialog right after calling it,
+        // which tears down the composition and cancels `scope` along with it. That raced away the
+        // network attempt (and, worse, the offline SyncQueue.enqueue fallback that's supposed to
+        // guarantee this doesn't get lost) before either could finish. A short-lived scope of its
+        // own survives the dialog closing, same pattern as WakeAlarmReceiver/BootReceiver's
+        // fire-and-forget work.
+        CoroutineScope(Dispatchers.Default).launch {
+            val result = ApiClient.postFocusActivity("focus", elapsedMinutes, task.id.ifBlank { null }, sessionId)
+            if (result.isFailure) {
+                SyncQueue.enqueue(
+                    PendingOp(
+                        id = SyncQueue.newOpId(),
+                        type = PendingOp.TYPE_LOG_FOCUS_ACTIVITY,
+                        createdAt = System.currentTimeMillis(),
+                        taskId = task.id.ifBlank { null },
+                        mode = "focus",
+                        minutes = elapsedMinutes
+                    )
+                )
+            }
+        }
+    }
+
+    // Ending a session before it naturally completes still credits every full minute actually
+    // spent — it just doesn't resume later and doesn't count as a finished "session" (no
+    // session-count bump, no celebration), since the pomodoro itself wasn't seen through.
+    fun logPartialFocus() {
+        val elapsed = elapsedFocusMinutes()
+        logFocusActivity(elapsed)
+        if (elapsed >= 1) StatsRepository.bumpFocusMinutes(elapsed)
+    }
+
     // Closing mid-session (X, back, or tapping outside) abandons the session the same way "End
-    // early" does — both cancel the actual /api/focus/state session, not just clear the "don't
-    // notify me" signal the reminders evaluator reads. Without the cancel call, the session stayed
-    // "active" server-side after the dialog closed, so MonitorService's background poll (which
-    // drives the cross-device focus pill) would still report it completed once its original end
-    // time arrived, silently crediting focus minutes for a session the user had actually left.
+    // early" does — both cancel the actual /api/focus/state session (so a later resume never picks
+    // it back up) rather than just clearing the "don't notify me" signal the reminders evaluator
+    // reads. Without the cancel call, the session stayed "active" server-side after the dialog
+    // closed, so MonitorService's background poll (which drives the cross-device focus pill) would
+    // still report it completed once its original end time arrived, on top of double-crediting the
+    // minutes [logPartialFocus] above just logged. Skipped entirely for a session that only exists
+    // locally (sessionId == null, started while offline) — there's nothing server-side to cancel.
     fun closeDialog() {
         if (state == FocusUiState.RUNNING) {
-            scope.launch {
-                ApiClient.cancelFocusSession()
-                ApiClient.postFocusState(false, null)
+            logPartialFocus()
+            if (sessionId != null) {
+                scope.launch {
+                    ApiClient.cancelFocusSession()
+                    ApiClient.postFocusState(false, null)
+                }
             }
         }
         onDismiss()
@@ -191,7 +249,20 @@ fun FocusPomodoroDialog(
                                         scope.launch { ApiClient.postFocusState(true, endsAtIso) }
                                         FocusSounds.start()
                                     }
-                                    result.onFailure { error = it.message ?: "Couldn't start focus session" }
+                                    result.onFailure { failure ->
+                                        if (ApiClient.isOffline()) {
+                                            // No server session to attach to — sessionId stays
+                                            // null, which is what the cross-device poll and the
+                                            // cancel/postFocusState calls above key off of to skip
+                                            // themselves for a session the server never knew about.
+                                            sessionId = null
+                                            endsAtMillis = System.currentTimeMillis() + minutes * 60_000L
+                                            state = FocusUiState.RUNNING
+                                            FocusSounds.start()
+                                        } else {
+                                            error = failure.message ?: "Couldn't start focus session"
+                                        }
+                                    }
                                 }
                             },
                             enabled = !starting,
@@ -216,15 +287,19 @@ fun FocusPomodoroDialog(
                         // client (e.g. the web app) — it would just keep ticking until its own
                         // local clock ran out. Poll the server's focus state so an out-of-band
                         // stop closes this dialog instead of silently drifting from reality.
-                        LaunchedEffect(sessionId) {
-                            while (isActive) {
-                                delay(8_000)
-                                val remote = ApiClient.getFocusState().getOrNull() ?: continue
-                                val stoppedElsewhere = !remote.active ||
-                                    (sessionId != null && remote.sessionId != null && remote.sessionId != sessionId)
-                                if (stoppedElsewhere) {
-                                    onDismiss()
-                                    break
+                        // No poll for a session that only exists locally (sessionId == null,
+                        // started while offline) — there's no server record to drift from yet.
+                        if (sessionId != null) {
+                            LaunchedEffect(sessionId) {
+                                while (isActive) {
+                                    delay(8_000)
+                                    val remote = ApiClient.getFocusState().getOrNull() ?: continue
+                                    val stoppedElsewhere = !remote.active ||
+                                        (remote.sessionId != null && remote.sessionId != sessionId)
+                                    if (stoppedElsewhere) {
+                                        onDismiss()
+                                        break
+                                    }
                                 }
                             }
                         }
@@ -232,10 +307,8 @@ fun FocusPomodoroDialog(
                             endsAtMillis = endsAtMillis,
                             onTick = { remainingMs = it },
                             onFinished = {
-                                scope.launch {
-                                    ApiClient.postFocusActivity("focus", minutes, task.id.ifBlank { null }, sessionId)
-                                    ApiClient.postFocusState(false, null)
-                                }
+                                logFocusActivity(minutes)
+                                if (sessionId != null) scope.launch { ApiClient.postFocusState(false, null) }
                                 FocusSounds.complete()
                                 // Session-count bump happens once, in WorkScreen.handleCompletion("focus") — bumping it
                                 // here too would double-count it locally. Minutes aren't known there, so bump those here.
@@ -270,9 +343,12 @@ fun FocusPomodoroDialog(
                         Spacer(Modifier.height(40.dp))
                         OutlinedButton(
                             onClick = {
-                                scope.launch {
-                                    ApiClient.cancelFocusSession()
-                                    ApiClient.postFocusState(false, null)
+                                logPartialFocus()
+                                if (sessionId != null) {
+                                    scope.launch {
+                                        ApiClient.cancelFocusSession()
+                                        ApiClient.postFocusState(false, null)
+                                    }
                                 }
                                 onDismiss()
                             },

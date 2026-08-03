@@ -10,9 +10,14 @@ import java.util.Calendar
 
 /**
  * Schedules the sleep-window wake alarm via [AlarmManager.setAlarmClock] — the one AlarmManager
- * API that reliably survives Doze without needing the SCHEDULE_EXACT_ALARM permission, since
+ * API that's supposed to survive Doze without needing the SCHEDULE_EXACT_ALARM permission, since
  * it's meant exactly for user-visible alarms (shows the status-bar alarm-clock icon, same as
- * the stock Clock app).
+ * the stock Clock app). In practice at least one OEM (Oplus/ColorOS's AlarmManagerService)
+ * enforces the exact-alarm permission check even for setAlarmClock, throwing a SecurityException
+ * that isn't documented anywhere in stock Android — every call into AlarmManager below is
+ * wrapped so that failure degrades to "no alarm scheduled" instead of crashing the app. This is
+ * an acceptable degradation: the settings screen's own copy already says blocking still works
+ * without it, just via a 1-2 second poll instead of the accessibility service.
  */
 object AlarmScheduler {
 
@@ -22,7 +27,7 @@ object AlarmScheduler {
         val pendingIntent = alarmPendingIntent(appContext)
 
         if (!SleepPrefs.isEnabled(appContext)) {
-            am.cancel(pendingIntent)
+            runCatching { am.cancel(pendingIntent) }
             return
         }
 
@@ -40,7 +45,7 @@ object AlarmScheduler {
             Intent(appContext, com.secondbrain.lock.MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, showIntent), pendingIntent)
+        runCatching { am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, showIntent), pendingIntent) }
     }
 
     /** One-off snooze — doesn't touch the recurring daily schedule. */
@@ -54,7 +59,7 @@ object AlarmScheduler {
             Intent(appContext, com.secondbrain.lock.MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, showIntent), alarmPendingIntent(appContext))
+        runCatching { am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, showIntent), alarmPendingIntent(appContext)) }
     }
 
     /** One-off "wake me at this time instead" from the wake flow's own time picker — also
@@ -69,7 +74,7 @@ object AlarmScheduler {
             Intent(appContext, com.secondbrain.lock.MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, showIntent), alarmPendingIntent(appContext))
+        runCatching { am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, showIntent), alarmPendingIntent(appContext)) }
     }
 
     private fun alarmPendingIntent(context: Context): PendingIntent =

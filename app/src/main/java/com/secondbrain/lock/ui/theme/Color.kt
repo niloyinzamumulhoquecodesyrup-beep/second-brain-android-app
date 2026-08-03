@@ -29,6 +29,10 @@ val Mist500: Color get() = if (isLight) Color(0x6B121B1E) else Color(0x66F4F5F7)
 /** Legacy alias kept for existing call sites — maps to the dimmest text tier. */
 val Mist400: Color get() = Mist500
 
+// Bottom nav bar surface — deliberately its own token rather than reusing Ink900, since neither
+// Ink900 branch matches these exact requested values.
+val NavBarSurface: Color get() = if (isLight) Color(0xFFD9E6E9) else Color(0xFF121B1E)
+
 // Streak — the reward/streak feature's palette. accentRed/silver/callisto are flat across light
 // and dark (the design keeps them fixed); StreakCard is the design's tinted `card` surface,
 // which the streak feature's cards use in place of the app's plain Ink900/cardAlt.

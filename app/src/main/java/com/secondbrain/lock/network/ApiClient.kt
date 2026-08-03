@@ -1,6 +1,8 @@
 package com.secondbrain.lock.network
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.secondbrain.lock.BuildConfig
 import com.secondbrain.lock.data.FocusState
 import com.secondbrain.lock.data.RoutineCache
@@ -21,6 +23,7 @@ import com.secondbrain.lock.network.dto.MindcordDomainsResponse
 import com.secondbrain.lock.network.dto.MindcordMessageResponse
 import com.secondbrain.lock.network.dto.MindcordMessagesResponse
 import com.secondbrain.lock.network.dto.MindcordParticipantsResponse
+import com.secondbrain.lock.network.dto.NotificationPrefs
 import com.secondbrain.lock.network.dto.OkResponse
 import com.secondbrain.lock.network.dto.OtherBrainsClustersResponse
 import com.secondbrain.lock.network.dto.OtherBrainsIdentityResponse
@@ -28,8 +31,10 @@ import com.secondbrain.lock.network.dto.Packet
 import com.secondbrain.lock.network.dto.PlannerPromptRequest
 import com.secondbrain.lock.network.dto.PostBodyRequest
 import com.secondbrain.lock.network.dto.PostBookRequest
+import com.secondbrain.lock.network.dto.Profile
 import com.secondbrain.lock.network.dto.SendRoomMessageRequest
 import com.secondbrain.lock.network.dto.SetDisplayNameRequest
+import com.secondbrain.lock.network.dto.UpdateProfileRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -116,6 +121,45 @@ object ApiClient {
     fun logout() {
         SecurePrefs.clearAuth(appContext)
     }
+
+    /** One-shot connectivity check (no persistent listener) — callers use this right after a
+     * failed request to decide whether to queue it for later ([com.secondbrain.lock.data.SyncQueue])
+     * instead of surfacing it as a real error. */
+    fun isOffline(): Boolean {
+        val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return true
+        val network = cm.activeNetwork ?: return true
+        val capabilities = cm.getNetworkCapabilities(network) ?: return true
+        return !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    // ---- Account settings: profile, avatar, password, deactivation, quiet hours ----
+
+    /** Caller should follow a success with [com.secondbrain.lock.data.repo.ProfileRepository.refresh]. */
+    suspend fun updateProfileName(name: String): Result<Profile> =
+        patchTyped("/api/auth/profile", UpdateProfileRequest(name))
+
+    suspend fun changePassword(currentPassword: String, newPassword: String): Result<Unit> {
+        val body = JSONObject().put("currentPassword", currentPassword).put("newPassword", newPassword)
+        return postJson("/api/auth/password", body).map {}
+    }
+
+    /** [mimeType] e.g. "image/jpeg"; [base64Data] the raw (unprefixed) base64-encoded image bytes. */
+    suspend fun uploadAvatar(mimeType: String, base64Data: String): Result<Unit> {
+        val body = JSONObject().put("mime_type", mimeType).put("data", base64Data)
+        return postJson("/api/auth/avatar", body).map {}
+    }
+
+    /** Signs out and blocks login server-side; the caller is still responsible for clearing the
+     * locally stored token/session the same way a normal logout does. */
+    suspend fun deactivateAccount(password: String): Result<Unit> {
+        val body = JSONObject().put("password", password)
+        return postJson("/api/auth/deactivate", body).map {}
+    }
+
+    suspend fun getNotificationPrefs(): Result<NotificationPrefs> = getTyped("/api/notification-prefs")
+
+    suspend fun updateNotificationPrefs(quietStartMin: Int?, quietEndMin: Int?): Result<NotificationPrefs> =
+        putTyped("/api/notification-prefs", NotificationPrefs(quietStartMin, quietEndMin))
 
     /** GET an endpoint under [baseUrl], with the bearer token and shared cookies attached. */
     suspend fun get(path: String): Result<JSONObject> = withContext(Dispatchers.IO) {

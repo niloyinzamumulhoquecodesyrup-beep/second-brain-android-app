@@ -116,41 +116,56 @@ private fun ThemeToggle() {
 private fun UserMenu(onOpenSettings: () -> Unit, onLogout: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val profile by ProfileRepository.profile.collectAsState()
+    val avatarVersion by ProfileRepository.avatarVersion.collectAsState()
 
-    IconButton(onClick = { expanded = true }, modifier = Modifier.size(32.dp)) {
-        val p = profile
-        if (p?.hasAvatar == true) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .border(BorderStroke(1.dp, Ink500), CircleShape)
-            ) {
-                AsyncImage(
-                    model = "${ApiClient.baseUrl}/api/auth/avatar",
-                    contentDescription = "Account",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+    // DropdownMenu anchors to whatever layout node directly contains it — without this Box
+    // wrapping both the trigger and the menu, that node was UserMenu's caller (TopBar's Row),
+    // so the menu popped up at the Row's own origin (the far left of the screen) instead of
+    // under the avatar button.
+    Box {
+        IconButton(onClick = { expanded = true }, modifier = Modifier.size(32.dp)) {
+            val p = profile
+            if (p?.hasAvatar == true) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Ink700)
+                        .border(BorderStroke(1.dp, Ink500), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Initials stay as a backdrop underneath — AsyncImage renders nothing while
+                    // loading or on error, so without this the circle goes empty every time the
+                    // `?v=` cache-buster changes the URL (i.e. right after every upload).
+                    Text(initials(p.name, p.email), color = Mist100, fontSize = 12.sp, style = SecondBrainTypography.labelSmall)
+                    AsyncImage(
+                        // `?v=` busts Coil's cache after a new photo is uploaded — see
+                        // ProfileRepository.avatarVersion for why the bare URL alone isn't enough.
+                        model = "${ApiClient.baseUrl}/api/auth/avatar?v=$avatarVersion",
+                        contentDescription = "Account",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            } else if (p != null) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Ink700)
+                        .border(BorderStroke(1.dp, Ink500), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(initials(p.name, p.email), color = Mist100, fontSize = 12.sp, style = SecondBrainTypography.labelSmall)
+                }
+            } else {
+                Icon(Icons.Filled.AccountCircle, contentDescription = "Account", tint = Mist300)
             }
-        } else if (p != null) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(Ink700)
-                    .border(BorderStroke(1.dp, Ink500), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(initials(p.name, p.email), color = Mist100, fontSize = 12.sp, style = SecondBrainTypography.labelSmall)
-            }
-        } else {
-            Icon(Icons.Filled.AccountCircle, contentDescription = "Account", tint = Mist300)
         }
-    }
-    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.widthIn(min = 160.dp)) {
-        DropdownMenuItem(text = { Text("Settings") }, onClick = { expanded = false; onOpenSettings() })
-        DropdownMenuItem(text = { Text("Log out", color = Rose400) }, onClick = { expanded = false; onLogout() })
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.widthIn(min = 160.dp)) {
+            DropdownMenuItem(text = { Text("Settings") }, onClick = { expanded = false; onOpenSettings() })
+            DropdownMenuItem(text = { Text("Log out", color = Rose400) }, onClick = { expanded = false; onLogout() })
+        }
     }
 }
 

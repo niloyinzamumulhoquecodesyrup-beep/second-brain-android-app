@@ -96,7 +96,7 @@ internal fun StreakArrowBadge(size: androidx.compose.ui.unit.Dp, fontSize: andro
 private fun StreakSummaryCard(computed: RewardComputation, onClick: () -> Unit) {
     StreakSurface(onClick = onClick) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-            SbSectionTitle("You're doing great", color = StreakAccent)
+            SbSectionTitle(currentHeadlinePhrase(), color = StreakAccent)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Tap for stats", color = Mist400, fontSize = 12.sp)
                 Spacer(Modifier.width(8.dp))
@@ -106,14 +106,18 @@ private fun StreakSummaryCard(computed: RewardComputation, onClick: () -> Unit) 
 
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.Bottom) {
-            Text("${computed.streak}-day ", color = Mist100, fontSize = 34.sp, fontWeight = FontWeight.Normal)
-            Text("streak", color = Mist100, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
+            Text("${computed.streak}-day ", color = Mist100, fontSize = 17.sp, fontWeight = FontWeight.Normal)
+            Text("streak", color = Mist100, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
         }
 
         computed.next?.let { nextBadge ->
             Spacer(Modifier.height(6.dp))
             Text("Next: ${nextBadge.icon} ${nextBadge.label}", color = Mist300, fontSize = 14.sp)
         }
+
+        Spacer(Modifier.height(6.dp))
+        val todayFocusMinutes = computed.gauges.first { it.label == "Focus time" }.value
+        Text("⚡ ${formatFocusMinutes(todayFocusMinutes)} focused today", color = Mist300, fontSize = 14.sp)
 
         Spacer(Modifier.height(10.dp))
         Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(4.dp)).background(Ink700)) {
@@ -131,6 +135,46 @@ private fun StreakSummaryCard(computed: RewardComputation, onClick: () -> Unit) 
         }
     }
 }
+
+/** Rotates the streak card's "YOU'RE DOING GREAT"-style headline through a mix of blunt
+ * motivation and warm praise, changing every 6 hours. Time-bucketed rather than stored/random so
+ * it's deterministic — same phrase for everyone in the same 6-hour window, no state to persist. */
+private val HEADLINE_PHRASES = listOf(
+    "Turn pain into power.",
+    "Destroy your own limits.",
+    "Fortune favors the bold.",
+    "Through struggle comes strength.",
+    "Make your own luck.",
+    "Make it happen.",
+    "Keep moving forward.",
+    "Prove them wrong.",
+    "Find a way.",
+    "you're doing great",
+    "keep up the effort",
+    "that is incredible",
+    "what a stellar job",
+    "this is phenomenal",
+    "way to go champion",
+    "spot on, my friend",
+    "absolutely perfect",
+    "such amazing work!",
+    "fantastic progress",
+    "Burn the ships.",
+    "Defy the odds.",
+    "Conquer from within.",
+    "Forge your path.",
+    "Evolve or repeat.",
+    "awesome job so far",
+    "Dream big, work hard.",
+    "Focus on the good.",
+    "Be your own hero.",
+    "Action creates real change."
+)
+
+private const val SIX_HOURS_MS = 6 * 60 * 60 * 1000L
+
+internal fun currentHeadlinePhrase(): String =
+    HEADLINE_PHRASES[((System.currentTimeMillis() / SIX_HOURS_MS) % HEADLINE_PHRASES.size).toInt()]
 
 internal fun periodSummary(label: String, totals: PeriodTotals): String =
     "$label: ${totals.notes} notes · ${totals.tasks} tasks · ${totals.focusSessions} focus sessions · " +

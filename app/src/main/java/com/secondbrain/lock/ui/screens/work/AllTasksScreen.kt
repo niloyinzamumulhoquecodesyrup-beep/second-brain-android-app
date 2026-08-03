@@ -111,8 +111,9 @@ fun AllTasksScreen(
     // celebration overlay is a WorkScreen-only flourish — this is a secondary/detail screen.
     fun toggleDone(task: Task, value: Boolean) {
         scope.launch {
-            TasksRepository.setDone(task.id, value)
-            if (value) StatsRepository.bumpTaskDone()
+            TasksRepository.setDone(task.id, value).onSuccess {
+                if (value) StatsRepository.bumpTaskDone()
+            }
         }
     }
     fun deleteTask(task: Task) {
@@ -199,7 +200,7 @@ fun AllTasksScreen(
                         TimelineRow(
                             icon = RowIcon.TASK,
                             title = task.title,
-                            subtitle = "Completed",
+                            subtitle = if (task.pendingSync) "Syncing…" else "Completed",
                             subtitleColor = Mist400,
                             bg = rowBg(index),
                             dotColor = StreakSilver,
@@ -302,7 +303,7 @@ private fun TodayTimelineList(
                 TimelineRow(
                     icon = RowIcon.TASK,
                     title = item.task.title,
-                    subtitle = info.text,
+                    subtitle = if (item.task.pendingSync) "Syncing… · ${info.text}" else info.text,
                     subtitleColor = if (info.overdue) Red400 else Mist300,
                     bg = rowBg(index),
                     dotColor = dotColor,
@@ -353,7 +354,7 @@ private fun TaskTimelineList(
         TimelineRow(
             icon = RowIcon.TASK,
             title = task.title,
-            subtitle = info.text,
+            subtitle = if (task.pendingSync) "Syncing… · ${info.text}" else info.text,
             subtitleColor = if (info.overdue) Red400 else Mist300,
             bg = rowBg(index),
             dotColor = if (isCurrentNow(task.startMin, task.durationMin, nowMinute)) StreakAccent else StreakSilver,

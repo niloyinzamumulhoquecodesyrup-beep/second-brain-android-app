@@ -22,6 +22,10 @@ private const val NOTE_DETAIL_ROUTE = "note/{noteId}"
 private const val STREAK_DETAIL_ROUTE = "streak"
 private const val ALL_TASKS_ROUTE = "tasks"
 
+/** Reached from the top bar's avatar menu — distinct from [Destination.SHIELD], which stays
+ * scoped to app-blocking config. */
+const val ACCOUNT_SETTINGS_ROUTE = "account_settings"
+
 /**
  * The 5 top-level tabs, plus a "note/{noteId}" detail route pushed on top from Organize (and
  * recursively from note detail's own links/related). Shield reuses the existing onboarding/
@@ -31,6 +35,7 @@ private const val ALL_TASKS_ROUTE = "tasks"
 fun AppNavHost(
     navController: NavHostController,
     shieldContent: @Composable (PaddingValues) -> Unit,
+    accountSettingsContent: @Composable (PaddingValues) -> Unit,
     topBar: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues()
@@ -71,6 +76,7 @@ fun AppNavHost(
             MindverseScreen(contentPadding = contentPadding, topBar = topBar)
         }
         composable(Destination.SHIELD.route) { shieldContent(contentPadding) }
+        composable(ACCOUNT_SETTINGS_ROUTE) { accountSettingsContent(contentPadding) }
         composable(STREAK_DETAIL_ROUTE) {
             StreakDetailScreen(onBack = { navController.popBackStack() }, contentPadding = contentPadding)
         }

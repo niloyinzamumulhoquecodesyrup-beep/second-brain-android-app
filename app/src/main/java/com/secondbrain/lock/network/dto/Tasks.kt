@@ -23,7 +23,10 @@ data class Task(
     @SerialName("duration_min") val durationMin: Int? = null,
     @SerialName("completed_at") val completedAt: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
-    val pieces: List<TaskPiece>? = null
+    val pieces: List<TaskPiece>? = null,
+    /** Local-only: true while this task (or an edit to it) is queued in [com.secondbrain.lock.data.SyncQueue]
+     * waiting for connectivity. Never sent to or set by the server. */
+    val pendingSync: Boolean = false
 )
 
 @Serializable
