@@ -143,3 +143,17 @@ data class OtherBrainsCluster(val domain: String, val brains: Int = 0)
 
 @Serializable
 data class OtherBrainsClustersResponse(val clusters: List<OtherBrainsCluster> = emptyList())
+
+/** One entry from Metered's TURN credential mint — `urls` is a single server URI per entry
+ * (STUN entries have no username/credential; TURN entries do), not a list. */
+@Serializable
+data class IceServerDto(
+    val urls: String = "",
+    val username: String? = null,
+    val credential: String? = null
+)
+
+/** GET /api/mindcord/turn-credentials — short-lived STUN+TURN mix scoped to this room join;
+ * the Metered secret key that mints these never reaches the client, only this resolved list. */
+@Serializable
+data class TurnCredentialsResponse(@SerialName("iceServers") val iceServers: List<IceServerDto> = emptyList())

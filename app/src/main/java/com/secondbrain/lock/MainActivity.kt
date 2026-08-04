@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.secondbrain.lock.data.AppLimit
 import com.secondbrain.lock.data.AppLimitRepository
@@ -44,6 +45,7 @@ import com.secondbrain.lock.service.MonitorService
 import com.secondbrain.lock.ui.nav.ACCOUNT_SETTINGS_ROUTE
 import com.secondbrain.lock.ui.nav.AppNavHost
 import com.secondbrain.lock.ui.nav.BottomBar
+import com.secondbrain.lock.ui.nav.MINDVERSE_ROOM_ROUTE
 import com.secondbrain.lock.ui.nav.QuickAddChooserSheet
 import com.secondbrain.lock.ui.nav.QuickAddTaskSheet
 import com.secondbrain.lock.ui.nav.TopBar
@@ -54,6 +56,7 @@ import com.secondbrain.lock.ui.screens.DashboardScreen
 import com.secondbrain.lock.ui.screens.LoginScreen
 import com.secondbrain.lock.ui.screens.OnboardingScreen
 import com.secondbrain.lock.ui.screens.PermissionStep
+import com.secondbrain.lock.ui.screens.RegisterScreen
 import com.secondbrain.lock.ui.screens.SettingsScreen
 import com.secondbrain.lock.ui.screens.organize.CaptureSheet
 import com.secondbrain.lock.ui.theme.SecondBrainLockTheme
@@ -84,28 +87,51 @@ private fun RootApp() {
     val scope = rememberCoroutineScope()
 
     var authToken by remember { mutableStateOf(SecurePrefs.getToken(context)) }
-    var loginLoading by remember { mutableStateOf(false) }
-    var loginError by remember { mutableStateOf<String?>(null) }
+    var showRegister by remember { mutableStateOf(false) }
+    var authLoading by remember { mutableStateOf(false) }
+    var authError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         ApiClient.onUnauthorized.collect { authToken = null }
     }
 
     if (authToken == null) {
-        LoginScreen(
-            isLoading = loginLoading,
-            errorMessage = loginError,
-            onLogin = { email, password ->
-                loginError = null
-                loginLoading = true
-                scope.launch {
-                    val result = ApiClient.login(email, password)
-                    loginLoading = false
-                    result.onSuccess { token -> authToken = token }
-                    result.onFailure { error -> loginError = error.message ?: "Login failed" }
-                }
-            }
-        )
+        if (showRegister) {
+            RegisterScreen(
+                isLoading = authLoading,
+                errorMessage = authError,
+                onRegister = { email, password ->
+                    authError = null
+                    authLoading = true
+                    scope.launch {
+                        val result = ApiClient.register(email, password)
+                            // register() only sets a cookie; log in right after to get the
+                            // bearer token the native app actually stores.
+                            .mapCatching { ApiClient.login(email, password).getOrThrow() }
+                        authLoading = false
+                        result.onSuccess { token -> authToken = token }
+                        result.onFailure { error -> authError = error.message ?: "Registration failed" }
+                    }
+                },
+                onNavigateToLogin = { authError = null; showRegister = false }
+            )
+        } else {
+            LoginScreen(
+                isLoading = authLoading,
+                errorMessage = authError,
+                onLogin = { email, password ->
+                    authError = null
+                    authLoading = true
+                    scope.launch {
+                        val result = ApiClient.login(email, password)
+                        authLoading = false
+                        result.onSuccess { token -> authToken = token }
+                        result.onFailure { error -> authError = error.message ?: "Login failed" }
+                    }
+                },
+                onNavigateToRegister = { authError = null; showRegister = true }
+            )
+        }
         return
     }
 
@@ -132,11 +158,19 @@ private fun RootApp() {
 
     var quickAddStep by remember { mutableStateOf<QuickAddStep?>(null) }
 
+    // The Mindverse room is a full-screen call takeover (its own camera-grid/controls bottom
+    // chrome) — showing the app's own bottom nav bar underneath it as well would double up on
+    // bottom chrome, so it's hidden for exactly that one route.
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val inMindverseRoom = currentBackStackEntry?.destination?.route == MINDVERSE_ROOM_ROUTE
+
     Box(Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                BottomBar(navController, onAddClick = { quickAddStep = QuickAddStep.CHOOSER })
+                if (!inMindverseRoom) {
+                    BottomBar(navController, onAddClick = { quickAddStep = QuickAddStep.CHOOSER })
+                }
             }
         ) { padding ->
             AppNavHost(

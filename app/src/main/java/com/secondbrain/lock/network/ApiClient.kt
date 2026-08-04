@@ -34,6 +34,7 @@ import com.secondbrain.lock.network.dto.PostBookRequest
 import com.secondbrain.lock.network.dto.Profile
 import com.secondbrain.lock.network.dto.SendRoomMessageRequest
 import com.secondbrain.lock.network.dto.SetDisplayNameRequest
+import com.secondbrain.lock.network.dto.TurnCredentialsResponse
 import com.secondbrain.lock.network.dto.UpdateProfileRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -114,6 +115,25 @@ object ApiClient {
                 val respEmail = obj.optString("email", email)
                 SecurePrefs.saveAuth(appContext, respEmail, token)
                 token
+            }
+        }
+    }
+
+    /**
+     * Creates a new account. `/api/auth/register` only sets a cookie and returns `{email}` (no
+     * bearer token — it's the web login route's sibling), so the caller should follow success
+     * with [login] using the same credentials to obtain the token native needs.
+     */
+    suspend fun register(email: String, password: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val payload = JSONObject().put("email", email).put("password", password)
+            val request = Request.Builder()
+                .url("$baseUrl/api/auth/register")
+                .post(payload.toString().toRequestBody(jsonMediaType))
+                .build()
+            client.newCall(request).execute().use { response ->
+                val bodyString = response.body?.string().orEmpty()
+                if (!response.isSuccessful) throw IOException(errorMessage(response.code, bodyString))
             }
         }
     }
@@ -282,6 +302,11 @@ object ApiClient {
      * room, so the server's stale-participant expiry (>45s) doesn't silently boot an active user. */
     suspend fun postMindcordHeartbeat(roomId: String): Result<Unit> =
         postTyped<HeartbeatRequest, OkResponse>("/api/mindcord/heartbeat", HeartbeatRequest(roomId)).map {}
+
+    /** Short-lived STUN+TURN server list for the WebRTC mesh — fetch once per room join (shared
+     * by every [org.webrtc.PeerConnection] in that room), never per-peer-connection. */
+    suspend fun getMindcordTurnCredentials(): Result<TurnCredentialsResponse> =
+        getTyped("/api/mindcord/turn-credentials")
 
     /** Aggregate-only "who's studying what": domain name + distinct-account headcount. */
     suspend fun getOtherBrainsClusters(): Result<OtherBrainsClustersResponse> = getTyped("/api/other-brains/clusters")

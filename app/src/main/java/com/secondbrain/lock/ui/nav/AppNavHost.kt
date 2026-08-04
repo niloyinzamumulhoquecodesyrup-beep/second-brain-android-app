@@ -11,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.secondbrain.lock.ui.screens.mind.MindScreen
+import com.secondbrain.lock.ui.screens.mindverse.MindverseRoomScreen
 import com.secondbrain.lock.ui.screens.mindverse.MindverseScreen
 import com.secondbrain.lock.ui.screens.organize.NoteDetailScreen
 import com.secondbrain.lock.ui.screens.organize.OrganizeScreen
@@ -25,6 +26,12 @@ private const val ALL_TASKS_ROUTE = "tasks"
 /** Reached from the top bar's avatar menu — distinct from [Destination.SHIELD], which stays
  * scoped to app-blocking config. */
 const val ACCOUNT_SETTINGS_ROUTE = "account_settings"
+
+/** Full-screen, bottom-nav-hiding call takeover pushed once Mindcord reports a joined room.
+ * No argument — the screen reads the joined room straight off MindverseRepository's
+ * currentRoom StateFlow, same as the room picker does. Exported (not private) so MainActivity
+ * can compare against it to hide the bottom nav bar while this route is on top. */
+const val MINDVERSE_ROOM_ROUTE = "mindverse_room"
 
 /**
  * The 5 top-level tabs, plus a "note/{noteId}" detail route pushed on top from Organize (and
@@ -73,7 +80,14 @@ fun AppNavHost(
             MindScreen(onOpenNote = openNote, contentPadding = contentPadding, topBar = topBar)
         }
         composable(Destination.MINDVERSE.route) {
-            MindverseScreen(contentPadding = contentPadding, topBar = topBar)
+            MindverseScreen(
+                contentPadding = contentPadding,
+                topBar = topBar,
+                onOpenRoom = { navController.navigate(MINDVERSE_ROOM_ROUTE) }
+            )
+        }
+        composable(MINDVERSE_ROOM_ROUTE) {
+            MindverseRoomScreen(onBack = { navController.popBackStack() }, contentPadding = contentPadding)
         }
         composable(Destination.SHIELD.route) { shieldContent(contentPadding) }
         composable(ACCOUNT_SETTINGS_ROUTE) { accountSettingsContent(contentPadding) }

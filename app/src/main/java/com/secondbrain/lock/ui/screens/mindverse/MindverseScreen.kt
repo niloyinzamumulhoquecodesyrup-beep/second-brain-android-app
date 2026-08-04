@@ -47,7 +47,11 @@ import kotlinx.coroutines.launch
  * box/currently-studying) was dropped — not needed for now.
  */
 @Composable
-fun MindverseScreen(contentPadding: PaddingValues = PaddingValues(), topBar: @Composable () -> Unit = {}) {
+fun MindverseScreen(
+    contentPadding: PaddingValues = PaddingValues(),
+    topBar: @Composable () -> Unit = {},
+    onOpenRoom: () -> Unit = {}
+) {
     val identity by MindverseRepository.identity.collectAsState()
     val identityChecked by MindverseRepository.identityChecked.collectAsState()
 
@@ -70,7 +74,7 @@ fun MindverseScreen(contentPadding: PaddingValues = PaddingValues(), topBar: @Co
             when {
                 !identityChecked -> Text("Loading…", color = Mist400, style = SecondBrainTypography.bodyMedium)
                 identity == null -> PickDisplayNameCard()
-                else -> MindcordTab()
+                else -> MindcordTab(onOpenRoom = onOpenRoom)
             }
             Spacer(Modifier.height(32.dp))
         }

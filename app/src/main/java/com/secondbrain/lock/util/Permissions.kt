@@ -36,6 +36,15 @@ object Permissions {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    /** Mindcord room's mic/camera — checked independently since a call is usable audio-only. */
+    fun hasMicrophone(context: Context): Boolean =
+        ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+
+    fun hasCamera(context: Context): Boolean =
+        ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+
     fun allGranted(context: Context): Boolean =
         hasOverlay(context) && hasUsageAccess(context) && hasNotifications(context)
 

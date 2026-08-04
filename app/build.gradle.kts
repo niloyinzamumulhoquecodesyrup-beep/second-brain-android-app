@@ -21,6 +21,17 @@ android {
         val baseUrl = (project.findProperty("SB_BASE_URL") as String?)
             ?: "https://second-brain-pi-six.vercel.app"
         buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
+
+        // Supabase Realtime (Mindcord live messages/participants) — the anon key is public by
+        // design (RLS on mindcord_messages/mindcord_participants is read-only for it, see the web
+        // repo's 022_mindcord.sql), same as it being embedded in the web app's client bundle.
+        // Override with -PSB_SUPABASE_URL=... / -PSB_SUPABASE_ANON_KEY=... if the project changes.
+        val supabaseUrl = (project.findProperty("SB_SUPABASE_URL") as String?)
+            ?: "https://uzscrxlcrxchyckumwls.supabase.co"
+        val supabaseAnonKey = (project.findProperty("SB_SUPABASE_ANON_KEY") as String?)
+            ?: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6c2NyeGxjcnhjaHlja3Vtd2xzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MTAxNjgsImV4cCI6MjA5ODk4NjE2OH0.uDWMKhBxGlTlJu6vInBtLCDx4127IUVi7mg0tjItnn4"
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
     }
 
     buildTypes {
@@ -87,6 +98,11 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Mindcord's voice/video mesh (Phase 2) — GetStream's actively maintained WebRTC AAR, since
+    // Google's own org.webrtc:google-webrtc was pulled from Maven/JCenter years ago. Same
+    // org.webrtc.* API surface either way (this fork just repackages upstream releases).
+    implementation("io.getstream:stream-webrtc-android:1.1.1")
 
     implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
     implementation("com.google.firebase:firebase-analytics")

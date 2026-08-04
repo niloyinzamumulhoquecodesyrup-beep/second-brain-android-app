@@ -16,7 +16,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,51 +28,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.secondbrain.lock.ui.theme.Ink500
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
 import com.secondbrain.lock.ui.theme.Rose400
 import com.secondbrain.lock.ui.theme.SbCard
-import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
 import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.fullAuraBackground
 
-/** Shared by [LoginScreen] and [RegisterScreen]. Mirrors [AccountSettingsScreen]'s field styling
- * — the same "current design" pass (StreakAccent + SbCard/SbSectionTitle instead of the old
- * Emerald/SbLabel look). */
+/** Mirrors the web app's `pages/register.js`: email + password + confirm, 8-char minimum,
+ * client-side match check before ever hitting the network — same rules `/api/auth/register`
+ * enforces server-side. */
 @Composable
-internal fun authFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = StreakAccent.copy(alpha = 0.6f),
-    unfocusedBorderColor = Ink500,
-    focusedTextColor = Mist100,
-    unfocusedTextColor = Mist100,
-    focusedLabelColor = StreakAccent,
-    unfocusedLabelColor = Mist400,
-    cursorColor = StreakAccent
-)
-
-/** Shared by [LoginScreen] and [RegisterScreen]. */
-@Composable
-internal fun AuthHeader(eyebrow: String, title: String) {
-    Text("Slay Task", color = Mist100, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
-    Spacer(Modifier.height(20.dp))
-    SbSectionTitle(eyebrow, color = StreakAccent)
-    Spacer(Modifier.height(8.dp))
-    Text(title, color = Mist100, fontSize = 28.sp, fontWeight = FontWeight.Light)
-}
-
-@Composable
-fun LoginScreen(
+fun RegisterScreen(
     isLoading: Boolean,
     errorMessage: String?,
-    onLogin: (email: String, password: String) -> Unit,
-    onNavigateToRegister: () -> Unit
+    onRegister: (email: String, password: String) -> Unit,
+    onNavigateToLogin: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var localError by remember { mutableStateOf<String?>(null) }
 
     Box(Modifier.fullAuraBackground().fillMaxSize()) {
         Column(
@@ -81,20 +58,14 @@ fun LoginScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 64.dp)
         ) {
-            AuthHeader(eyebrow = "Welcome back", title = "Sign in")
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Use the same account you use on the web.",
-                style = SecondBrainTypography.bodyMedium,
-                color = Mist400
-            )
+            AuthHeader(eyebrow = "Get started", title = "Create your account")
 
             Spacer(Modifier.height(24.dp))
 
             SbCard {
                 OutlinedTextField(
                     value = email,
-                    onValueChange = { email = it },
+                    onValueChange = { email = it; localError = null },
                     label = { Text("Email") },
                     singleLine = true,
                     enabled = !isLoading,
@@ -105,7 +76,7 @@ fun LoginScreen(
                 Spacer(Modifier.height(14.dp))
                 OutlinedTextField(
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = { password = it; localError = null },
                     label = { Text("Password") },
                     singleLine = true,
                     enabled = !isLoading,
@@ -114,17 +85,39 @@ fun LoginScreen(
                     colors = authFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(14.dp))
+                OutlinedTextField(
+                    value = confirm,
+                    onValueChange = { confirm = it; localError = null },
+                    label = { Text("Confirm password") },
+                    singleLine = true,
+                    enabled = !isLoading,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    colors = authFieldColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-                if (errorMessage != null) {
+                val shownError = localError ?: errorMessage
+                if (shownError != null) {
                     Spacer(Modifier.height(12.dp))
-                    Text(errorMessage, style = SecondBrainTypography.bodySmall, color = Rose400)
+                    Text(shownError, style = SecondBrainTypography.bodySmall, color = Rose400)
                 }
 
                 Spacer(Modifier.height(20.dp))
 
                 Button(
-                    onClick = { onLogin(email.trim(), password) },
-                    enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
+                    onClick = {
+                        when {
+                            password.length < 8 -> localError = "Password must be at least 8 characters"
+                            password != confirm -> localError = "Passwords do not match"
+                            else -> {
+                                localError = null
+                                onRegister(email.trim(), password)
+                            }
+                        }
+                    },
+                    enabled = !isLoading && email.isNotBlank() && password.isNotBlank() && confirm.isNotBlank(),
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = StreakAccent,
@@ -135,20 +128,20 @@ fun LoginScreen(
                     if (isLoading) {
                         CircularProgressIndicator(modifier = Modifier.height(20.dp), color = Color.White, strokeWidth = 2.dp)
                     } else {
-                        Text("Log in", fontWeight = FontWeight.Medium)
+                        Text("Create account", fontWeight = FontWeight.Medium)
                     }
                 }
             }
 
             Spacer(Modifier.height(20.dp))
             Row {
-                Text("No account yet? ", style = SecondBrainTypography.bodySmall, color = Mist300)
+                Text("Already have an account? ", style = SecondBrainTypography.bodySmall, color = Mist300)
                 Text(
-                    "Create one",
+                    "Sign in",
                     style = SecondBrainTypography.bodySmall,
                     color = StreakAccent,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable(enabled = !isLoading, onClick = onNavigateToRegister)
+                    modifier = Modifier.clickable(enabled = !isLoading, onClick = onNavigateToLogin)
                 )
             }
         }
