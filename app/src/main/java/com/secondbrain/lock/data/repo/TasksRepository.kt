@@ -6,6 +6,8 @@ import com.secondbrain.lock.data.SyncQueue
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.network.dto.CreateTaskRequest
 import com.secondbrain.lock.network.dto.Task
+import com.secondbrain.lock.network.dto.TaskBreakdownRequest
+import com.secondbrain.lock.network.dto.TaskBreakdownResponse
 import com.secondbrain.lock.network.dto.TaskPiece
 import com.secondbrain.lock.network.dto.UpdateTaskRequest
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -91,6 +93,12 @@ object TasksRepository {
     suspend fun setPieces(id: String, pieces: List<TaskPiece>): Result<Task> =
         ApiClient.putTyped<UpdateTaskRequest, Task>("/api/tasks/$id", UpdateTaskRequest(pieces = pieces))
             .onSuccess { updated -> _tasks.value = _tasks.value.map { if (it.id == id) updated else it } }
+
+    /** AI breakdown of a task into subtasks (long-press on a task row). Purely a lookup — the
+     * suggestions it returns are ephemeral until the caller adds one via [create]/[reschedule], so
+     * this doesn't touch [_tasks]/[_error] the way the mutators above do. */
+    suspend fun breakdown(task: String): Result<TaskBreakdownResponse> =
+        ApiClient.postTyped<TaskBreakdownRequest, TaskBreakdownResponse>("/api/tasks/breakdown", TaskBreakdownRequest(task))
 
     /** A task that never synced (still has its local placeholder id) is simply dropped — and its
      * queued create cancelled via [SyncQueue.cancelPendingCreate] — rather than deleted

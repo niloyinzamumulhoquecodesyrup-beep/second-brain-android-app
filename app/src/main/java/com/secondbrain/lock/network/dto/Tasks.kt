@@ -46,3 +46,22 @@ data class UpdateTaskRequest(
     @SerialName("duration_min") val durationMin: Int? = null,
     val pieces: List<TaskPiece>? = null
 )
+
+/** POST /api/tasks/breakdown request. */
+@Serializable
+data class TaskBreakdownRequest(val task: String)
+
+/** One AI-suggested subtask from a breakdown — not a real [Task] until the user adds it. */
+@Serializable
+data class TaskBreakdownSubtask(
+    val topic: String,
+    @SerialName("estimated_minutes") val estimatedMinutes: Int
+)
+
+/** POST /api/tasks/breakdown response. */
+@Serializable
+data class TaskBreakdownResponse(
+    val task: String,
+    val subtasks: List<TaskBreakdownSubtask>,
+    @SerialName("remaining_today") val remainingToday: Int
+)

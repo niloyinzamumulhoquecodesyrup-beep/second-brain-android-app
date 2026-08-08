@@ -57,14 +57,19 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Slim top bar: logo mark + wordmark, then ThemeToggle + user menu (Settings/Logout).
+ * Slim top bar: logo mark + wordmark, then ThemeToggle + user menu (Settings/Shield/Logout).
  *
  * Scrolls away with the page like any other content — callers place this as the first item in
  * their own scrollable column rather than pinning it via Scaffold's `topBar` slot, so it carries
  * no background/blur of its own.
  */
 @Composable
-fun TopBar(onOpenSettings: () -> Unit, onLogout: () -> Unit, modifier: Modifier = Modifier) {
+fun TopBar(
+    onOpenSettings: () -> Unit,
+    onOpenShield: () -> Unit,
+    onLogout: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     LaunchedEffect(Unit) {
         launch { ProfileRepository.refresh() }
         while (isActive) {
@@ -88,7 +93,7 @@ fun TopBar(onOpenSettings: () -> Unit, onLogout: () -> Unit, modifier: Modifier 
         Spacer(Modifier.weight(1f))
         ThemeToggle()
         Spacer(Modifier.width(16.dp))
-        UserMenu(onOpenSettings = onOpenSettings, onLogout = onLogout)
+        UserMenu(onOpenSettings = onOpenSettings, onOpenShield = onOpenShield, onLogout = onLogout)
     }
 }
 
@@ -113,7 +118,7 @@ private fun ThemeToggle() {
 }
 
 @Composable
-private fun UserMenu(onOpenSettings: () -> Unit, onLogout: () -> Unit) {
+private fun UserMenu(onOpenSettings: () -> Unit, onOpenShield: () -> Unit, onLogout: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val profile by ProfileRepository.profile.collectAsState()
     val avatarVersion by ProfileRepository.avatarVersion.collectAsState()
@@ -164,6 +169,7 @@ private fun UserMenu(onOpenSettings: () -> Unit, onLogout: () -> Unit) {
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.widthIn(min = 160.dp)) {
             DropdownMenuItem(text = { Text("Settings") }, onClick = { expanded = false; onOpenSettings() })
+            DropdownMenuItem(text = { Text("Shield") }, onClick = { expanded = false; onOpenShield() })
             DropdownMenuItem(text = { Text("Log out", color = Rose400) }, onClick = { expanded = false; onLogout() })
         }
     }

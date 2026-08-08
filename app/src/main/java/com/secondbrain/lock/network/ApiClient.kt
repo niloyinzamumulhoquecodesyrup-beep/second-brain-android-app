@@ -36,6 +36,8 @@ import com.secondbrain.lock.network.dto.SendRoomMessageRequest
 import com.secondbrain.lock.network.dto.SetDisplayNameRequest
 import com.secondbrain.lock.network.dto.TurnCredentialsResponse
 import com.secondbrain.lock.network.dto.UpdateProfileRequest
+import com.secondbrain.lock.network.dto.VoiceClassifyRequest
+import com.secondbrain.lock.network.dto.VoiceClassifyResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -187,7 +189,10 @@ object ApiClient {
             val request = Request.Builder().url("$baseUrl$path").get().build()
             client.newCall(request).execute().use { response ->
                 val bodyString = response.body?.string().orEmpty()
-                if (!response.isSuccessful) throw IOException(errorMessage(response.code, bodyString))
+                if (!response.isSuccessful) {
+                    logFailure(request, response.code, bodyString)
+                    throw IOException(errorMessage(response.code, bodyString))
+                }
                 if (bodyString.isBlank()) JSONObject() else JSONObject(bodyString)
             }
         }
@@ -263,6 +268,11 @@ object ApiClient {
 
     /** All packets distilled so far — created via [createPacket] but never listed anywhere. */
     suspend fun getPackets(): Result<List<Packet>> = getTyped("/api/packets")
+
+    /** Sends the on-device [SpeechRecognizer][android.speech.SpeechRecognizer] transcript from the
+     * shield button's long-press for the backend to classify into a task or a PARA capture. */
+    suspend fun classifyVoice(transcript: String): Result<VoiceClassifyResponse> =
+        postTyped("/api/voice/classify", VoiceClassifyRequest(transcript))
 
     /** Accept (action="create_task", value={title}) or dismiss (action="skip") a queue item. */
     suspend fun answerMindQueue(id: String, request: MindQueueAnswerRequest): Result<OkResponse> =
@@ -354,7 +364,10 @@ object ApiClient {
                 .build()
             client.newCall(request).execute().use { response ->
                 val bodyString = response.body?.string().orEmpty()
-                if (!response.isSuccessful) throw IOException(errorMessage(response.code, bodyString))
+                if (!response.isSuccessful) {
+                    logFailure(request, response.code, bodyString)
+                    throw IOException(errorMessage(response.code, bodyString))
+                }
                 if (bodyString.isBlank()) JSONObject() else JSONObject(bodyString)
             }
         }
@@ -365,6 +378,15 @@ object ApiClient {
         return if (!detail.isNullOrBlank()) detail else "Request failed ($code)"
     }
 
+    /** Debug-only: every non-2xx response gets logged with its method/URL/body so a failure can be
+     * traced back to the exact call that caused it — there's no request/response logging otherwise,
+     * so a bare "Request failed (500)" surfaced in the UI is otherwise a dead end to diagnose. */
+    private fun logFailure(request: Request, code: Int, body: String) {
+        if (BuildConfig.DEBUG) {
+            android.util.Log.w("ApiClient", "${request.method} ${request.url} -> $code: $body")
+        }
+    }
+
     // ---- kotlinx.serialization-based typed helpers, used by the repository layer ----
     // Kept alongside the org.json helpers above (used by FocusState/RoutineCache, which power
     // the already-shipping Shield/blocking subsystem) rather than replacing them, so nothing
@@ -373,7 +395,10 @@ object ApiClient {
     @PublishedApi internal suspend fun executeRaw(request: Request): String = withContext(Dispatchers.IO) {
         client.newCall(request).execute().use { response ->
             val bodyString = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throw IOException(errorMessage(response.code, bodyString))
+            if (!response.isSuccessful) {
+                logFailure(request, response.code, bodyString)
+                throw IOException(errorMessage(response.code, bodyString))
+            }
             bodyString
         }
     }

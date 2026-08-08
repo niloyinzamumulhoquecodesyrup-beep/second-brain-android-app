@@ -1,5 +1,8 @@
 package com.secondbrain.lock.ui.nav
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,6 +33,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
@@ -45,8 +51,11 @@ import com.secondbrain.lock.R
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.NavBarSurface
 import com.secondbrain.lock.ui.theme.SbThemeState
+import com.secondbrain.lock.ui.screens.work.BreakdownLoadingDots
 import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.ThemeMode
+import com.secondbrain.lock.util.Permissions
+import com.secondbrain.lock.util.VoiceTranscriber
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
@@ -89,6 +98,12 @@ fun BottomBar(navController: NavHostController, onAddClick: () -> Unit, modifier
     val leftDestinations = Destination.bottomBarOrder.take(2)
     val rightDestinations = Destination.bottomBarOrder.drop(2)
     val barShape = NotchedTopBarShape(BarCornerRadius, NotchRadius, FilletRadius)
+
+    val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
+    val requestMicPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) VoiceTranscriber.start(context) }
 
     Box(modifier.fillMaxWidth()) {
         NavigationBar(
@@ -142,28 +157,41 @@ fun BottomBar(navController: NavHostController, onAddClick: () -> Unit, modifier
                     // just the icon itself floating, nothing behind it.
                     .offset(x = -ShieldButtonMarginEnd, y = -(ShieldButtonSize + ShieldButtonGap))
                     .size(ShieldButtonSize)
-                    .clickable {
-                        navController.navigate(Destination.SHIELD.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+                    // A single tap starts voice capture: haptic fires immediately, then
+                    // VoiceTranscriber takes over the rest of the lifecycle on its own — it keeps
+                    // listening through pauses/breaths and only stops once there's a real gap in
+                    // speech (see SilencePauseMs), submitting automatically at that point. The
+                    // Shield dashboard itself moved to the account dropdown (TopBar's UserMenu) so
+                    // this button could be freed up for the simpler one-tap gesture.
+                    .clickable(onClick = {
+                        if (!VoiceTranscriber.isProcessing && !VoiceTranscriber.isListening) {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (Permissions.hasMicrophone(context)) {
+                                VoiceTranscriber.start(context)
+                            } else {
+                                requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
+                            }
                         }
-                    },
+                    }),
                 contentAlignment = Alignment.Center
             ) {
-                // Light mode gets its own variant (pale disc behind the rings); dark mode keeps
-                // the near-black one. Reading SbThemeState.mode here makes this recompose live
-                // when the user flips the theme toggle.
-                val shieldRes = if (SbThemeState.mode == ThemeMode.LIGHT) {
-                    R.drawable.ic_shield_custom_light
+                if (VoiceTranscriber.isProcessing) {
+                    BreakdownLoadingDots()
                 } else {
-                    R.drawable.ic_shield_custom
+                    // Light mode gets its own variant (pale disc behind the rings); dark mode keeps
+                    // the near-black one. Reading SbThemeState.mode here makes this recompose live
+                    // when the user flips the theme toggle.
+                    val shieldRes = if (SbThemeState.mode == ThemeMode.LIGHT) {
+                        R.drawable.ic_shield_custom_light
+                    } else {
+                        R.drawable.ic_shield_custom
+                    }
+                    Image(
+                        painter = painterResource(shieldRes),
+                        contentDescription = "Shield",
+                        modifier = Modifier.size(ShieldButtonSize)
+                    )
                 }
-                Image(
-                    painter = painterResource(shieldRes),
-                    contentDescription = "Shield",
-                    modifier = Modifier.size(ShieldButtonSize)
-                )
             }
         }
     }

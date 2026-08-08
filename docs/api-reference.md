@@ -39,6 +39,7 @@ the in-app WebView instead).
 |---|---|
 | ✅ `GET/POST /` | POST `{title,note_id,due_date}` |
 | ✅ `PUT/DELETE /[id]` | `{title,done,due_date,start_min,duration_min,pieces[]}` — also used by [SyncQueue.kt](../app/src/main/java/com/secondbrain/lock/data/SyncQueue.kt) to replay offline task edits once connectivity returns |
+| ✅ `POST /breakdown` | `{task}` → `{task, subtasks:[{topic,estimated_minutes}], remaining_today}` — AI subtask suggestions, long-press a task row in [TasksPanel.kt](../app/src/main/java/com/secondbrain/lock/ui/screens/work/TasksPanel.kt); `remaining_today` is a server-enforced daily quota, native surfaces "0 task breakdowns left today" once it hits 0 |
 
 ## Planner (`/api/planner/*`)
 
@@ -121,3 +122,5 @@ either changes.
 - Mobile-specific additions (`POST /api/auth/mobile`, `GET/POST/DELETE /api/focus/state`) added to the
   web repo 2026-07-25 (`migrations/030_focus_state.sql`) — additive only, no change to existing
   cookie/web client behavior.
+- `POST /api/tasks/breakdown` documented 2026-08-06 from the native diff that added it (uncommitted at
+  the time) — not independently re-verified against the web repo's route handler.

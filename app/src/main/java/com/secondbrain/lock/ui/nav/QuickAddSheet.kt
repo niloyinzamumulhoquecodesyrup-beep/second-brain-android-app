@@ -59,8 +59,9 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Opens the platform time picker anchored on [initial], reporting the picked time-of-day. */
-private fun pickTime(context: android.content.Context, initial: LocalTime, onPicked: (LocalTime) -> Unit) {
+/** Opens the platform time picker anchored on [initial], reporting the picked time-of-day. Shared
+ * with TasksPanel's "schedule a breakdown suggestion for a later day" flow. */
+internal fun pickTime(context: android.content.Context, initial: LocalTime, onPicked: (LocalTime) -> Unit) {
     TimePickerDialog(
         context,
         { _, hour, minute -> onPicked(LocalTime.of(hour, minute)) },

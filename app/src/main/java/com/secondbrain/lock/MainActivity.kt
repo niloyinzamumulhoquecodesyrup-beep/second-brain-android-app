@@ -45,10 +45,12 @@ import com.secondbrain.lock.service.MonitorService
 import com.secondbrain.lock.ui.nav.ACCOUNT_SETTINGS_ROUTE
 import com.secondbrain.lock.ui.nav.AppNavHost
 import com.secondbrain.lock.ui.nav.BottomBar
+import com.secondbrain.lock.ui.nav.Destination
 import com.secondbrain.lock.ui.nav.MINDVERSE_ROOM_ROUTE
 import com.secondbrain.lock.ui.nav.QuickAddChooserSheet
 import com.secondbrain.lock.ui.nav.QuickAddTaskSheet
 import com.secondbrain.lock.ui.nav.TopBar
+import com.secondbrain.lock.ui.nav.VoiceListenOverlay
 import com.secondbrain.lock.ui.screens.AccountSettingsScreen
 import com.secondbrain.lock.ui.screens.AddAppScreen
 import com.secondbrain.lock.ui.screens.DashboardRow
@@ -152,6 +154,7 @@ private fun RootApp() {
     val topBar: @Composable () -> Unit = {
         TopBar(
             onOpenSettings = { navController.navigate(ACCOUNT_SETTINGS_ROUTE) },
+            onOpenShield = { navController.navigate(Destination.SHIELD.route) },
             onLogout = onLogout
         )
     }
@@ -205,6 +208,8 @@ private fun RootApp() {
             )
             null -> {}
         }
+
+        VoiceListenOverlay()
     }
 }
 
