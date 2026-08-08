@@ -23,6 +23,10 @@ import kotlinx.coroutines.launch
  * enough to survive a breath or "umm" mid-thought, short enough that it doesn't feel stuck. */
 private const val SilencePauseMs = 2000
 
+/** Effectively "never" for [sticky] sessions — a long-press should stay open through silence
+ * (thinking pauses, background noise) rather than auto-submitting the way a tap does. */
+private const val StickySilencePauseMs = Int.MAX_VALUE
+
 /**
  * Wraps [SpeechRecognizer] for the shield button's tap-to-talk voice capture. A singleton because
  * only one listening session is ever active, and the trigger (BottomBar's tap), the full-screen
@@ -32,8 +36,10 @@ private const val SilencePauseMs = 2000
  * The button only *starts* the session — [start] is a fire-and-forget trigger, not something the
  * caller holds open. Once running, the recognizer keeps listening through pauses/breaths and
  * decides for itself when the user is done talking (a real [SilencePauseMs] gap in speech), at
- * which point it submits automatically via [finishListening]. That's what lets the gesture work
- * as "tap once, keep listening until you stop talking" instead of requiring a held button.
+ * which point it submits automatically via [finishListening]. That's what lets a tap work as "tap
+ * once, keep listening until you stop talking" instead of requiring a held button. A long-press
+ * starts the same session in [sticky][start] mode instead, which stays open through silence too —
+ * for when the user wants to think mid-capture without the session cutting them off.
  */
 object VoiceTranscriber {
     var isListening by mutableStateOf(false)
@@ -73,32 +79,39 @@ object VoiceTranscriber {
         }
     }
 
-    fun start(context: Context) {
+    /** @param sticky When true (the shield button's long-press), the recognizer ignores silence
+     * gaps entirely instead of auto-submitting after [SilencePauseMs] — the session stays open
+     * until [stop] is called explicitly (a tap while already listening). */
+    fun start(context: Context, sticky: Boolean = false) {
         if (isListening || !SpeechRecognizer.isRecognitionAvailable(context)) return
         transcript = ""
         isListening = true
         appContext = context.applicationContext
-        FeedbackUtil.voiceStart(context)
         val r = SpeechRecognizer.createSpeechRecognizer(context)
         recognizer = r
         r.setRecognitionListener(listener)
+        val silenceMs = if (sticky) StickySilencePauseMs else SilencePauseMs
         r.startListening(
             Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                // Only a full SilencePauseMs of quiet after speech ends the session — the default
+                // Only a full silenceMs of quiet after speech ends the session — the default
                 // (~1s on most devices) was cutting sentences off mid-thought.
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SilencePauseMs)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, SilencePauseMs)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, silenceMs)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, silenceMs)
             }
         )
     }
 
-    /** Manual early stop/cancel — nothing in the UI calls this today (the button no longer stops
-     * listening on release), kept as an escape hatch. */
+    /** Manual early stop/cancel — the tap-to-stop gesture on an already-listening session (mainly
+     * how a [sticky][start] long-press session ever ends, since it ignores silence on its own).
+     * Only requests the wind-down; [recognizer]'s own onResults/onError callback — fired
+     * asynchronously once it finishes packaging up whatever was captured — is what actually tears
+     * the session down via [finishListening] and submits it. Destroying the recognizer here
+     * instead (as this used to) raced that callback and killed it before it could ever fire,
+     * silently dropping the capture. */
     fun stop() {
         recognizer?.stopListening()
-        teardown()
     }
 
     /** The recognizer itself decided the user is done talking (a real result, or a no-speech/
@@ -107,7 +120,6 @@ object VoiceTranscriber {
         val context = appContext
         teardown()
         if (context != null) {
-            FeedbackUtil.voiceStop(context)
             scope.launch { classify(context) }
         }
     }

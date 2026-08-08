@@ -1,12 +1,15 @@
 package com.secondbrain.lock.data
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.media.ToneGenerator
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import com.secondbrain.lock.R
 
 /**
  * Short tick feedback for gesture UI (the PARA card-stack's spin), gated on [SoundHapticsPrefs].
@@ -55,41 +58,38 @@ object FeedbackUtil {
         }
     }
 
-    /** Shield button's voice capture starting to listen — a short, higher "ding". Distinct from
-     * [voiceStop] (recording ending) and [successDing] (the backend finishing up), so all three
-     * stages of one capture read as three different events rather than the same beep three times. */
-    fun voiceStart(context: Context) {
-        if (SoundHapticsPrefs.isSoundsEnabled(context)) {
-            runCatching { toneGenerator()?.startTone(ToneGenerator.TONE_PROP_BEEP, 120) }
-        }
-    }
-
-    /** Shield button's voice capture ending — a lower "dong" once the recognizer detects the
-     * silence pause and stops listening, right before the transcript heads off to the backend. */
-    fun voiceStop(context: Context) {
-        if (SoundHapticsPrefs.isSoundsEnabled(context)) {
-            runCatching { toneGenerator()?.startTone(ToneGenerator.TONE_PROP_ACK, 150) }
-        }
-    }
-
-    /** A single "ding" once a backgrounded request finishes successfully (e.g. the shield button's
-     * voice capture being classified) — a longer, higher tone than [spinTick]'s rapid-fire beep so
-     * it reads as a distinct "done" cue rather than another tick.
+    /** Plays once a backgrounded request finishes successfully (e.g. the shield button's voice
+     * capture being classified into a new task).
      *
-     * Deliberately its own short-lived [ToneGenerator] on STREAM_NOTIFICATION rather than the
-     * shared STREAM_SYSTEM instance every other cue here uses — on at least one OEM skin (ColorOS)
-     * STREAM_SYSTEM tones fired outside a direct touch callback (this one fires after an async
-     * network response, not from the tap itself) were confirmed reaching this code but producing
-     * no audible sound, while [FocusPomodoro][com.secondbrain.lock.ui.screens.work.FocusPomodoro]'s
-     * near-identical "session complete" cue already relies on this exact STREAM_NOTIFICATION
-     * pattern successfully. */
+     * Deliberately USAGE_NOTIFICATION_EVENT rather than ASSISTANCE_SONIFICATION — on at least one
+     * OEM skin (ColorOS) ASSISTANCE_SONIFICATION audio fired outside a direct touch callback (this
+     * one fires after an async network response, not from the tap itself) was confirmed reaching
+     * this code but producing no audible sound, while
+     * [FocusPomodoro][com.secondbrain.lock.ui.screens.work.FocusPomodoro]'s near-identical "session
+     * complete" cue already relies on this exact notification-stream pattern successfully. */
     fun successDing(context: Context) {
+        playRaw(context, R.raw.notification_sound_3, AudioAttributes.USAGE_NOTIFICATION_EVENT)
+    }
+
+    // Fire-and-forget MediaPlayers must be kept reachable until they finish — a purely local
+    // reference can be garbage-collected mid-playback, cutting the clip short.
+    private val activePlayers = mutableSetOf<MediaPlayer>()
+
+    /** Fire-and-forget playback of a [raw][R.raw] audio resource, released once playback completes. */
+    private fun playRaw(context: Context, resId: Int, usage: Int) {
         if (!SoundHapticsPrefs.isSoundsEnabled(context)) return
         runCatching {
-            val tg = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 90)
-            tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 150)
-            android.os.Handler(android.os.Looper.getMainLooper())
-                .postDelayed({ runCatching { tg.release() } }, 350L)
+            val attributes = AudioAttributes.Builder()
+                .setUsage(usage)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            val mp = MediaPlayer.create(context.applicationContext, resId, attributes, 0) ?: return@runCatching
+            activePlayers += mp
+            mp.setOnCompletionListener {
+                activePlayers -= it
+                it.release()
+            }
+            mp.start()
         }
     }
 

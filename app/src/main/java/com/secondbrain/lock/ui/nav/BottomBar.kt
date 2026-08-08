@@ -3,10 +3,13 @@ package com.secondbrain.lock.ui.nav
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,9 +26,13 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -34,6 +41,7 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -48,6 +56,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.secondbrain.lock.R
+import com.secondbrain.lock.data.FeedbackUtil
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.NavBarSurface
 import com.secondbrain.lock.ui.theme.SbThemeState
@@ -80,6 +89,9 @@ private val BarHeight = 72.dp
 private val ShieldButtonSize = 48.dp
 private val ShieldButtonGap = 12.dp
 private val ShieldButtonMarginEnd = 18.dp
+// How much bigger the button gets while pressed or actively listening — a scale-only transform
+// (drawing, not layout), so it grows in place without pushing or resizing anything around it.
+private const val ShieldButtonActiveScale = 1.8f
 
 /**
  * 4-tab bottom nav (Work/Organize/Mind/Mindverse). Shield is not a nav item here — it's a fixed
@@ -98,12 +110,6 @@ fun BottomBar(navController: NavHostController, onAddClick: () -> Unit, modifier
     val leftDestinations = Destination.bottomBarOrder.take(2)
     val rightDestinations = Destination.bottomBarOrder.drop(2)
     val barShape = NotchedTopBarShape(BarCornerRadius, NotchRadius, FilletRadius)
-
-    val context = LocalContext.current
-    val haptics = LocalHapticFeedback.current
-    val requestMicPermission = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted) VoiceTranscriber.start(context) }
 
     Box(modifier.fillMaxWidth()) {
         NavigationBar(
@@ -149,50 +155,118 @@ fun BottomBar(navController: NavHostController, onAddClick: () -> Unit, modifier
         // Hidden while already on the Shield tab — no point floating a button to the screen
         // you're already looking at.
         if (currentRoute != Destination.SHIELD.route) {
-            Box(
+            ShieldVoiceButton(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     // Sits a fixed gap above the bar's top edge, pinned to the bottom-right
                     // corner — doesn't move with scroll or tab selection. No background/surface —
                     // just the icon itself floating, nothing behind it.
                     .offset(x = -ShieldButtonMarginEnd, y = -(ShieldButtonSize + ShieldButtonGap))
-                    .size(ShieldButtonSize)
-                    // A single tap starts voice capture: haptic fires immediately, then
-                    // VoiceTranscriber takes over the rest of the lifecycle on its own — it keeps
-                    // listening through pauses/breaths and only stops once there's a real gap in
-                    // speech (see SilencePauseMs), submitting automatically at that point. The
-                    // Shield dashboard itself moved to the account dropdown (TopBar's UserMenu) so
-                    // this button could be freed up for the simpler one-tap gesture.
-                    .clickable(onClick = {
+            )
+        }
+    }
+}
+
+/**
+ * The shield button's own gesture handling, factored out of [BottomBar] mainly for readability.
+ *
+ * A tap starts voice capture: haptic fires immediately, then [VoiceTranscriber] takes over the
+ * rest of the lifecycle on its own — it keeps listening through pauses/breaths and only stops
+ * once there's a real gap in speech, submitting automatically at that point. Tapping again while
+ * already listening ends the session early.
+ *
+ * A press-and-hold starts the same capture in "sticky" mode instead — it ignores silence entirely
+ * for as long as the button stays held, for a longer thought with pauses a plain tap's silence
+ * timeout would cut off, and stops the instant the finger lifts (no need to tap again).
+ *
+ * The button scales up by [ShieldButtonActiveScale] while held or actively listening — the only
+ * visual cue that a session is live, now that there's no full-screen overlay for it.
+ */
+@Composable
+fun BoxScope.ShieldVoiceButton(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
+    // Set right before requesting mic permission so the eventual grant callback (below) starts
+    // the session in whichever mode (tap vs. hold) the user actually triggered.
+    var pendingSticky by remember { mutableStateOf(false) }
+    // Whether the current touch already crossed the long-press threshold and put the recognizer
+    // into sticky mode — read on release to decide whether letting go should stop that session.
+    var stickyActive by remember { mutableStateOf(false) }
+    // Whether the finger is currently down on the button at all (tap or hold, before either is
+    // distinguished) — drives the scale-up purely as touch feedback, independent of stickyActive.
+    var pressed by remember { mutableStateOf(false) }
+    val requestMicPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) VoiceTranscriber.start(context, sticky = pendingSticky) }
+
+    val scale by animateFloatAsState(
+        targetValue = if (pressed || VoiceTranscriber.isListening) ShieldButtonActiveScale else 1f,
+        label = "shieldButtonScale"
+    )
+
+    Box(
+        modifier = modifier
+            .size(ShieldButtonSize)
+            .scale(scale)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        pressed = true
+                        // Suspends until the finger lifts (or the gesture is cancelled) — either
+                        // way, if a hold put us into sticky mode, releasing is what ends it.
+                        tryAwaitRelease()
+                        pressed = false
+                        if (stickyActive) {
+                            stickyActive = false
+                            VoiceTranscriber.stop()
+                        }
+                    },
+                    onTap = {
+                        when {
+                            VoiceTranscriber.isListening -> VoiceTranscriber.stop()
+                            !VoiceTranscriber.isProcessing -> {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                pendingSticky = false
+                                if (Permissions.hasMicrophone(context)) {
+                                    VoiceTranscriber.start(context)
+                                } else {
+                                    requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
+                                }
+                            }
+                        }
+                    },
+                    onLongPress = {
                         if (!VoiceTranscriber.isProcessing && !VoiceTranscriber.isListening) {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            stickyActive = true
+                            FeedbackUtil.longPressTick(context)
+                            pendingSticky = true
                             if (Permissions.hasMicrophone(context)) {
-                                VoiceTranscriber.start(context)
+                                VoiceTranscriber.start(context, sticky = true)
                             } else {
                                 requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
                             }
                         }
-                    }),
-                contentAlignment = Alignment.Center
-            ) {
-                if (VoiceTranscriber.isProcessing) {
-                    BreakdownLoadingDots()
-                } else {
-                    // Light mode gets its own variant (pale disc behind the rings); dark mode keeps
-                    // the near-black one. Reading SbThemeState.mode here makes this recompose live
-                    // when the user flips the theme toggle.
-                    val shieldRes = if (SbThemeState.mode == ThemeMode.LIGHT) {
-                        R.drawable.ic_shield_custom_light
-                    } else {
-                        R.drawable.ic_shield_custom
                     }
-                    Image(
-                        painter = painterResource(shieldRes),
-                        contentDescription = "Shield",
-                        modifier = Modifier.size(ShieldButtonSize)
-                    )
-                }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        if (VoiceTranscriber.isProcessing) {
+            BreakdownLoadingDots()
+        } else {
+            // Light mode gets its own variant (pale disc behind the rings); dark mode keeps the
+            // near-black one. Reading SbThemeState.mode here makes this recompose live when the
+            // user flips the theme toggle.
+            val shieldRes = if (SbThemeState.mode == ThemeMode.LIGHT) {
+                R.drawable.ic_shield_custom_light
+            } else {
+                R.drawable.ic_shield_custom
             }
+            Image(
+                painter = painterResource(shieldRes),
+                contentDescription = "Shield",
+                modifier = Modifier.size(ShieldButtonSize)
+            )
         }
     }
 }
