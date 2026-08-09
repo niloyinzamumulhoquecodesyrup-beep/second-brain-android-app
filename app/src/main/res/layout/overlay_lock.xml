@@ -3,7 +3,7 @@
     android:id="@+id/overlayRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#050607"
+    android:background="#08090B"
     android:orientation="vertical"
     android:gravity="center"
     android:clickable="true"
@@ -30,7 +30,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="DAILY LIMIT REACHED"
-        android:textColor="#5EEAD4"
+        android:textColor="#FB4F40"
+        android:textStyle="bold"
         android:textSize="11sp"
         android:letterSpacing="0.2"
         android:layout_marginBottom="14dp" />
@@ -39,7 +40,7 @@
         android:id="@+id/overlayAppName"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="#FFFFFF"
+        android:textColor="#F4F5F7"
         android:textSize="30sp"
         android:fontFamily="serif"
         android:gravity="center"
@@ -49,7 +50,7 @@
         android:id="@+id/overlaySubtitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="#8A929B"
+        android:textColor="#9EF4F5F7"
         android:textSize="14sp"
         android:gravity="center"
         android:layout_marginTop="10dp"
@@ -74,7 +75,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="RESETS IN"
-            android:textColor="#8A929B"
+            android:textColor="#9EF4F5F7"
             android:textSize="11sp"
             android:letterSpacing="0.2" />
 
@@ -93,10 +94,15 @@
         android:id="@+id/overlayHome"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="#A78BFA"
+        android:background="@drawable/overlay_home_pill_bg"
+        android:textColor="#08090B"
+        android:textStyle="bold"
         android:textSize="13sp"
         android:layout_marginTop="36dp"
-        android:padding="12dp"
+        android:paddingLeft="24dp"
+        android:paddingRight="24dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
         android:text="Return to home screen" />
 
 </com.secondbrain.lock.service.BlockingOverlayRoot>

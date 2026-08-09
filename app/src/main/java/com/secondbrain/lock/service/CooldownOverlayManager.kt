@@ -57,7 +57,7 @@ class CooldownOverlayManager(private val context: Context) {
         reasons.forEachIndexed { index, reason ->
             val chip = TextView(context).apply {
                 text = reason
-                setTextColor(0xFFA7AEB5.toInt())
+                setTextColor(0x9EF4F5F7.toInt())
                 textSize = 12.5f
                 setPadding(28, 16, 28, 16)
                 background = context.getDrawable(R.drawable.overlay_chip_bg)
