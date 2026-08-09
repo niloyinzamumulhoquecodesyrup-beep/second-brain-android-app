@@ -7,6 +7,7 @@ import com.secondbrain.lock.BuildConfig
 import com.secondbrain.lock.data.FocusState
 import com.secondbrain.lock.data.RoutineCache
 import com.secondbrain.lock.data.SecurePrefs
+import com.secondbrain.lock.network.dto.BriefingResponse
 import com.secondbrain.lock.network.dto.CommunityBookResponse
 import com.secondbrain.lock.network.dto.CommunityBooksResponse
 import com.secondbrain.lock.network.dto.CommunityMessageResponse
@@ -177,6 +178,9 @@ object ApiClient {
         val body = JSONObject().put("password", password)
         return postJson("/api/auth/deactivate", body).map {}
     }
+
+    /** Today's audio briefing — server enforces a once-per-UTC-day lock, no client-side force-regen. */
+    suspend fun getTodayBriefing(): Result<BriefingResponse> = postTyped("/api/briefing/today")
 
     suspend fun getNotificationPrefs(): Result<NotificationPrefs> = getTyped("/api/notification-prefs")
 

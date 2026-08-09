@@ -96,6 +96,8 @@ fun WorkScreen(
         ) {
             topBar()
             Spacer(Modifier.height(16.dp))
+            MorningBriefSection()
+            Spacer(Modifier.height(16.dp))
             NudgesStrip(onOpenTask = { id -> highlightTaskId = id })
             Spacer(Modifier.height(16.dp))
             RewardPanel(stats, onOpenDetail = onOpenStreak)
