@@ -4,7 +4,11 @@ import android.media.MediaPlayer
 import android.media.audiofx.Visualizer
 import android.util.Base64
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
@@ -14,10 +18,17 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -33,24 +44,37 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.secondbrain.lock.R
 import com.secondbrain.lock.data.MorningBriefPrefs
+import com.secondbrain.lock.data.MorningBriefRequest
 import com.secondbrain.lock.network.ApiClient
+import com.secondbrain.lock.network.dto.BriefingResponse
 import com.secondbrain.lock.ui.theme.StreakAccent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalTime
+import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-private enum class BriefState { LOADING, PLAYING, DONE }
+private enum class BriefState { LOADING, PLAYING, NOT_READY, DONE }
 
 /** Briefings don't exist yet for "today" until the server rolls its day over — matches the app's
  * own local-day boundary rather than the server's UTC one, close enough for a once-a-day nicety. */
 private const val EARLIEST_HOUR = 3
+
+/** How long to wait after a timed-out/dropped POST before trying the read-only GET fallback —
+ * generation can still be running server-side well past the POST's own timeout, so checking
+ * immediately would almost always just re-hit the same "not ready yet" 404. A full minute gives
+ * that background work real room to finish before we give up for the day. */
+private const val PostFailureRetryDelayMs = 60_000L
 
 /**
  * Ambient, text-free audio briefing card — shown above every other section on [WorkScreen], any
@@ -58,33 +82,53 @@ private const val EARLIEST_HOUR = 3
  * dependency — the first app-open past 3am each day is the trigger. Fetches
  * [ApiClient.getTodayBriefing], plays the WAV it returns, and collapses out of the layout the
  * moment playback finishes.
+ *
+ * Also resurfaces on demand: the "play my daily briefing" voice command bumps
+ * [MorningBriefRequest.id] while this section is mounted, which replays whatever's already cached
+ * (a plain GET, no POST/wait — the ambient trigger above already owns first-generation duty).
  */
 @Composable
 fun MorningBriefSection() {
     val context = LocalContext.current
-    val eligible = remember {
+    val ambientEligible = remember {
         LocalTime.now().hour >= EARLIEST_HOUR && !MorningBriefPrefs.hasPlayedToday(context)
     }
-    if (!eligible) return
 
-    var state by remember { mutableStateOf(BriefState.LOADING) }
+    var state by remember { mutableStateOf(if (ambientEligible) BriefState.LOADING else BriefState.DONE) }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
     var visualizer by remember { mutableStateOf<Visualizer?>(null) }
     // Real-time playback loudness (0..1) from Visualizer's waveform capture — drives the icon's
     // scale directly, no synthetic/timed animation standing in for it.
     var amplitude by remember { mutableFloatStateOf(0f) }
 
-    LaunchedEffect(Unit) {
-        val result = ApiClient.getTodayBriefing()
-        val briefing = result.getOrNull()
-        if (briefing == null) {
-            if (com.secondbrain.lock.BuildConfig.DEBUG) {
-                android.util.Log.w("MorningBrief", "fetch failed", result.exceptionOrNull())
-            }
-            // Ambient feature, no error UI — leave "played" unset so the window's next app-open retries.
-            state = BriefState.DONE
-            return@LaunchedEffect
-        }
+    // Tears down whatever's playing (if anything) and hides the card — shared by natural
+    // completion/error inside [playBriefing] and by the card's own close button, so either path
+    // leaves playback resources cleanly released and today's "played" flag set the same way.
+    // Explicitly stopping+releasing the player (rather than leaving it for DisposableEffect's
+    // eventual onDispose) matters here specifically because both the close button and a voice
+    // replay can interrupt live playback — without it, audio would keep going underneath.
+    val finish: () -> Unit = {
+        runCatching { player?.stop() }
+        runCatching { player?.release() }
+        player = null
+        runCatching { visualizer?.release() }
+        visualizer = null
+        amplitude = 0f
+        MorningBriefPrefs.markPlayedToday(context)
+        state = BriefState.DONE
+    }
+
+    // Decodes and plays [briefing]'s audio, wiring the same LOADING→PLAYING→DONE transitions
+    // regardless of whether the fetch that produced it was the ambient once-a-day one or a voice
+    // replay. Interrupts and replaces whatever's currently playing, if anything, so the two sources
+    // can never end up with two MediaPlayers running at once.
+    suspend fun playBriefing(briefing: BriefingResponse) {
+        runCatching { player?.stop() }
+        runCatching { player?.release() }
+        player = null
+        runCatching { visualizer?.release() }
+        visualizer = null
+        amplitude = 0f
         val file = withContext(Dispatchers.IO) {
             runCatching {
                 val bytes = Base64.decode(briefing.audio.data, Base64.DEFAULT)
@@ -95,16 +139,9 @@ fun MorningBriefSection() {
         }.getOrNull()
         if (file == null) {
             state = BriefState.DONE
-            return@LaunchedEffect
+            return
         }
         val mp = MediaPlayer()
-        val finish = {
-            runCatching { visualizer?.release() }
-            visualizer = null
-            amplitude = 0f
-            MorningBriefPrefs.markPlayedToday(context)
-            state = BriefState.DONE
-        }
         mp.setOnPreparedListener {
             state = BriefState.PLAYING
             it.start()
@@ -120,8 +157,51 @@ fun MorningBriefSection() {
         player = mp
     }
 
+    LaunchedEffect(Unit) {
+        if (!ambientEligible) return@LaunchedEffect
+        val result = ApiClient.getTodayBriefing(currentTimeMin = currentMinuteOfDay())
+        // A timed-out/dropped POST doesn't mean generation failed — it's likely still running
+        // server-side well after our connection gave up. Wait before the read-only GET check so
+        // that background work has a real chance to finish instead of just re-hitting the same
+        // "not ready yet" 404 immediately; the GET itself can't trigger a duplicate generation, so
+        // there's no harm trying even when the POST failed for an unrelated reason.
+        val briefing = result.getOrNull() ?: run {
+            delay(PostFailureRetryDelayMs)
+            ApiClient.getCachedBriefing().getOrNull()
+        }
+        if (briefing == null) {
+            if (com.secondbrain.lock.BuildConfig.DEBUG) {
+                android.util.Log.w("MorningBrief", "fetch failed", result.exceptionOrNull())
+            }
+            // Ambient feature, no error UI — leave "played" unset so the window's next app-open retries.
+            state = BriefState.DONE
+            return@LaunchedEffect
+        }
+        playBriefing(briefing)
+    }
+
+    LaunchedEffect(MorningBriefRequest.id) {
+        // id starts at 0 and this effect fires once on first composition regardless — skip that
+        // initial run so mounting the section doesn't itself count as a replay request.
+        if (MorningBriefRequest.id == 0) return@LaunchedEffect
+        state = BriefState.LOADING
+        val briefing = ApiClient.getCachedBriefing().getOrNull()
+        if (briefing == null) {
+            // Unlike the ambient trigger's silent failure above, this was an explicit "play my
+            // briefing" ask — it deserves visible feedback on the card itself rather than vanishing
+            // without a trace. Dismissing it here just hides the card (no finish()/markPlayedToday,
+            // since nothing actually played) so the ambient trigger's own retry-tomorrow bookkeeping
+            // is untouched.
+            state = BriefState.NOT_READY
+            return@LaunchedEffect
+        }
+        playBriefing(briefing)
+    }
+
     DisposableEffect(Unit) {
+        MorningBriefRequest.isMounted = true
         onDispose {
+            MorningBriefRequest.isMounted = false
             runCatching { visualizer?.release() }
             player?.release()
         }
@@ -131,7 +211,12 @@ fun MorningBriefSection() {
         visible = state != BriefState.DONE,
         exit = fadeOut() + shrinkVertically()
     ) {
-        MorningBriefCard(amplitude = if (state == BriefState.PLAYING) amplitude else 0f)
+        MorningBriefCard(
+            amplitude = if (state == BriefState.PLAYING) amplitude else 0f,
+            loading = state == BriefState.LOADING,
+            notReady = state == BriefState.NOT_READY,
+            onDismiss = if (state == BriefState.NOT_READY) { { state = BriefState.DONE } } else finish
+        )
     }
 }
 
@@ -167,7 +252,7 @@ private fun attachVisualizer(audioSessionId: Int, onLevel: (Float) -> Unit): Vis
 private val CardShape = RoundedCornerShape(24.dp)
 
 @Composable
-private fun MorningBriefCard(amplitude: Float) {
+private fun MorningBriefCard(amplitude: Float, loading: Boolean, notReady: Boolean, onDismiss: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -177,9 +262,16 @@ private fun MorningBriefCard(amplitude: Float) {
     ) {
         StarField(modifier = Modifier.matchParentSize())
 
-        Box(
+        IconButton(
+            onClick = onDismiss,
+            modifier = Modifier.align(Alignment.TopEnd).size(32.dp)
+        ) {
+            Icon(Icons.Filled.Close, contentDescription = "Dismiss", tint = Color.White.copy(alpha = 0.6f))
+        }
+
+        Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
-            contentAlignment = Alignment.Center
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             var emerge by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) { emerge = true }
@@ -204,6 +296,55 @@ private fun MorningBriefCard(amplitude: Float) {
                 modifier = Modifier
                     .size(64.dp)
                     .graphicsLayer(scaleX = finalScale, scaleY = finalScale)
+            )
+
+            if (loading) {
+                Row(modifier = Modifier.padding(top = 14.dp)) {
+                    Text(
+                        text = "Your morning brief is being prepared",
+                        color = StreakAccent,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    LoadingDots()
+                }
+            } else if (notReady) {
+                Text(
+                    text = "Today's briefing isn't ready yet",
+                    color = StreakAccent,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 14.dp)
+                )
+            }
+        }
+    }
+}
+
+/** Trailing "..." for the loading label — each dot bobs up and down a beat after the last, so the
+ * motion rolls left-to-right, while the sentence itself stays still and readable. */
+@Composable
+private fun LoadingDots() {
+    val infinite = rememberInfiniteTransition(label = "briefLoadingDots")
+    val phase by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing)
+        ),
+        label = "briefLoadingDotsPhase"
+    )
+    val amplitudePx = with(LocalDensity.current) { 3.dp.toPx() }
+
+    Row {
+        repeat(3) { index ->
+            val y = sin(phase + index * 0.9f) * amplitudePx
+            Text(
+                text = ".",
+                color = StreakAccent,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.graphicsLayer(translationY = y)
             )
         }
     }

@@ -7,6 +7,7 @@ import com.secondbrain.lock.BuildConfig
 import com.secondbrain.lock.data.FocusState
 import com.secondbrain.lock.data.RoutineCache
 import com.secondbrain.lock.data.SecurePrefs
+import com.secondbrain.lock.network.dto.BriefingRequest
 import com.secondbrain.lock.network.dto.BriefingResponse
 import com.secondbrain.lock.network.dto.CommunityBookResponse
 import com.secondbrain.lock.network.dto.CommunityBooksResponse
@@ -179,8 +180,19 @@ object ApiClient {
         return postJson("/api/auth/deactivate", body).map {}
     }
 
-    /** Today's audio briefing — server enforces a once-per-UTC-day lock, no client-side force-regen. */
-    suspend fun getTodayBriefing(): Result<BriefingResponse> = postTyped("/api/briefing/today")
+    /** Today's audio briefing — server enforces a once-per-UTC-day lock, no client-side force-regen.
+     * [currentTimeMin] (minutes since midnight, phone's local wall clock) only shapes the result on
+     * the first call of the day — once generated, that snapshot is baked into the cached audio for
+     * the rest of the day, so it's safe (and expected) to pass it on every call regardless. */
+    suspend fun getTodayBriefing(currentTimeMin: Int? = null): Result<BriefingResponse> =
+        postTyped("/api/briefing/today", BriefingRequest(currentTimeMin))
+
+    /** Read-only fetch of today's briefing if it's already been generated — 404s otherwise. Cannot
+     * trigger generation itself (no path from this handler to Groq/Gemini), so it's safe to call
+     * speculatively: as a POST-timeout fallback (the generation may have finished server-side even
+     * though our connection didn't hear back), or for a voice command like "play my daily briefing"
+     * that should only ever play an existing one, never kick off a new one. */
+    suspend fun getCachedBriefing(): Result<BriefingResponse> = getTyped("/api/briefing/today")
 
     suspend fun getNotificationPrefs(): Result<NotificationPrefs> = getTyped("/api/notification-prefs")
 
