@@ -76,6 +76,15 @@ private const val EARLIEST_HOUR = 3
  * that background work real room to finish before we give up for the day. */
 private const val PostFailureRetryDelayMs = 60_000L
 
+/** Set the moment the ambient trigger is attempted, independent of [MorningBriefPrefs]'s
+ * per-day "played" flag — that one only gets written on a *completed* play, so navigating away
+ * from the Work tab mid-fetch/mid-playback (tearing the section down before it ever finishes)
+ * would otherwise leave it unset, and the next time the section remounts (e.g. bouncing back from
+ * StreakDetailScreen) it'd start the whole fetch-and-play cycle over from scratch. A plain
+ * (non-remembered) top-level var survives exactly as long as intended: reset on process death, so
+ * a genuine cold app-open still retries, but revisiting the Work tab within the same session won't. */
+private var ambientAttemptedThisSession = false
+
 /**
  * Ambient, text-free audio briefing card — shown above every other section on [WorkScreen], any
  * time after [EARLIEST_HOUR] local time, once per day ([MorningBriefPrefs]). No wake-alarm/routine
@@ -91,7 +100,11 @@ private const val PostFailureRetryDelayMs = 60_000L
 fun MorningBriefSection() {
     val context = LocalContext.current
     val ambientEligible = remember {
-        LocalTime.now().hour >= EARLIEST_HOUR && !MorningBriefPrefs.hasPlayedToday(context)
+        val eligible = !ambientAttemptedThisSession &&
+            LocalTime.now().hour >= EARLIEST_HOUR &&
+            !MorningBriefPrefs.hasPlayedToday(context)
+        if (eligible) ambientAttemptedThisSession = true
+        eligible
     }
 
     var state by remember { mutableStateOf(if (ambientEligible) BriefState.LOADING else BriefState.DONE) }
