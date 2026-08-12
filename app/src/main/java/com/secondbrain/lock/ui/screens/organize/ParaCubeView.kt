@@ -474,12 +474,20 @@ private fun NoteTile(note: Note, bg: Color, enabled: Boolean, modifier: Modifier
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text(
-            note.title,
-            color = Mist100,
-            style = SecondBrainTypography.bodySmall,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                note.title,
+                color = Mist100,
+                style = SecondBrainTypography.bodySmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            // Queued offline, not yet synced — neutral dot, not an error color.
+            if (note.pendingSync) {
+                Spacer(Modifier.width(6.dp))
+                Box(Modifier.size(6.dp).clip(CircleShape).background(Mist300))
+            }
+        }
     }
 }

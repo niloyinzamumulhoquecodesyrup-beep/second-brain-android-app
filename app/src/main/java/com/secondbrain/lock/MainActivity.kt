@@ -3,6 +3,7 @@ package com.secondbrain.lock
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -39,9 +40,11 @@ import com.secondbrain.lock.data.AppLimitRepository
 import com.secondbrain.lock.data.InstalledAppInfo
 import com.secondbrain.lock.data.InstalledAppsRepository
 import com.secondbrain.lock.data.LocalCache
+import com.secondbrain.lock.data.PendingOp
 import com.secondbrain.lock.data.SchedulePrefs
 import com.secondbrain.lock.data.SecurePrefs
 import com.secondbrain.lock.data.SleepPrefs
+import com.secondbrain.lock.data.SyncQueue
 import com.secondbrain.lock.data.repo.ProfileRepository
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.service.MonitorService
@@ -148,7 +151,22 @@ private fun RootApp() {
         ProfileRepository.clear()
         // A different account may log in next on this device — don't let its first
         // launch flash the previous account's cached data before its own refresh lands.
-        scope.launch { LocalCache.clearAll() }
+        scope.launch {
+            // Best-effort: sync whatever we still can before the cache — and the pending-ops
+            // queue riding inside it — gets wiped below. A 401 doesn't take this path (the
+            // interceptor just nulls the token); this is explicit logout only.
+            runCatching { SyncQueue.flush() }
+            val orphaned = LocalCache.load<List<PendingOp>>("pending_ops").orEmpty()
+            LocalCache.clearAll()
+            if (orphaned.isNotEmpty()) {
+                // Ops belong to the account that created them. Don't restore them into the
+                // cache blind — the next login may be a different account, and replaying one
+                // user's task edits into another's account is far worse than losing them.
+                // TODO: key the preserved queue by the logged-out user's id and only restore it
+                // if the same account logs back in, instead of just logging the loss.
+                Log.w("Logout", "Discarded ${orphaned.size} unsynced op(s) on logout")
+            }
+        }
         authToken = null
     }
     // Built once and threaded down to every top-level tab so each one renders it as the first
@@ -289,6 +307,16 @@ private fun SettingsFlow(contentPadding: PaddingValues = PaddingValues(), topBar
                     granted = Permissions.hasAccessibility(context),
                     onRequest = { showAccessibilityRationale = true },
                     optional = true
+                ),
+                // optional = true is deliberate: the app must stay fully usable without this —
+                // reminders and the wake alarm degrade to inexact timing (plus the FCM backstop)
+                // rather than the app being blocked from finishing setup over it.
+                PermissionStep(
+                    title = "Exact alarms",
+                    description = "So reminders and your wake alarm fire at the right minute.",
+                    granted = Permissions.hasExactAlarm(context),
+                    onRequest = { context.startActivity(Permissions.exactAlarmIntent(context)) },
+                    optional = true
                 )
             )
         }
@@ -415,7 +443,10 @@ private fun SettingsFlow(contentPadding: PaddingValues = PaddingValues(), topBar
                     wakeMinuteOfDay = minute
                     SleepPrefs.setWakeMinuteOfDay(context, minute)
                     WakeFlowActivity.rescheduleAsync(context)
-                }
+                },
+                exactAlarmGranted = remember(settingsResumeTick) { Permissions.hasExactAlarm(context) },
+                alarmSchedulingFailed = remember(settingsResumeTick) { SleepPrefs.isAlarmSchedulingFailed(context) },
+                onFixExactAlarm = { context.startActivity(Permissions.exactAlarmIntent(context)) }
             )
         }
     }

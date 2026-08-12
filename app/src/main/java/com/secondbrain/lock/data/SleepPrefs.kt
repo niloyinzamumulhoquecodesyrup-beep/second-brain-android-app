@@ -13,6 +13,7 @@ object SleepPrefs {
     private const val KEY_JOURNAL_REMINDER_PENDING = "journal_reminder_pending"
     private const val KEY_MORNING_ROUTINE_ENDS_AT = "morning_routine_ends_at"
     private const val KEY_ONE_OFF_ALARM_AT = "one_off_alarm_at"
+    private const val KEY_ALARM_SCHEDULING_FAILED = "alarm_scheduling_failed"
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
@@ -83,6 +84,16 @@ object SleepPrefs {
     }
 
     fun oneOffAlarmAt(context: Context): Long = prefs(context).getLong(KEY_ONE_OFF_ALARM_AT, 0L)
+
+    /** Set by [com.secondbrain.lock.service.AlarmScheduler] whenever a wake-alarm AlarmManager
+     * call actually failed (missing exact-alarm permission, or an OEM SecurityException) — read by
+     * SettingsScreen to show a "can't schedule alarms" warning instead of silently doing nothing. */
+    fun setAlarmSchedulingFailed(context: Context, failed: Boolean) {
+        prefs(context).edit().putBoolean(KEY_ALARM_SCHEDULING_FAILED, failed).apply()
+    }
+
+    fun isAlarmSchedulingFailed(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_ALARM_SCHEDULING_FAILED, false)
 
     fun morningRoutineRemainingMinutes(context: Context): Int {
         val remaining = prefs(context).getLong(KEY_MORNING_ROUTINE_ENDS_AT, 0L) - System.currentTimeMillis()

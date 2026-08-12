@@ -1,20 +1,28 @@
 package com.secondbrain.lock.ui.screens.organize
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.secondbrain.lock.network.dto.Note
 import com.secondbrain.lock.ui.theme.Emerald400
 import com.secondbrain.lock.ui.theme.Gold500
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist400
+import com.secondbrain.lock.ui.theme.Mist500
 import com.secondbrain.lock.ui.theme.Rose400
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
 import com.secondbrain.lock.ui.theme.Violet400
@@ -56,6 +64,12 @@ fun NoteRow(note: Note, onOpen: () -> Unit, trailing: (@Composable () -> Unit)? 
             if (note.tags.isNotEmpty()) {
                 Text(note.tags.joinToString(" · "), color = Mist400, style = SecondBrainTypography.bodySmall)
             }
+        }
+        // Queued offline and not yet synced — neutral dot, not an error color. A capture that
+        // hasn't reached the server yet is fine, not broken.
+        if (note.pendingSync) {
+            Box(Modifier.size(6.dp).clip(CircleShape).background(Mist500))
+            Spacer(Modifier.width(8.dp))
         }
         trailing?.invoke()
     }

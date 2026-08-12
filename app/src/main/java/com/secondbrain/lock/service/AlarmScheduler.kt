@@ -4,20 +4,23 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.secondbrain.lock.data.RoutineRepository
 import com.secondbrain.lock.data.SleepPrefs
+import com.secondbrain.lock.util.Permissions
 import java.util.Calendar
 
 /**
  * Schedules the sleep-window wake alarm via [AlarmManager.setAlarmClock] — the one AlarmManager
  * API that's supposed to survive Doze without needing the SCHEDULE_EXACT_ALARM permission, since
  * it's meant exactly for user-visible alarms (shows the status-bar alarm-clock icon, same as
- * the stock Clock app). In practice at least one OEM (Oplus/ColorOS's AlarmManagerService)
- * enforces the exact-alarm permission check even for setAlarmClock, throwing a SecurityException
- * that isn't documented anywhere in stock Android — every call into AlarmManager below is
- * wrapped so that failure degrades to "no alarm scheduled" instead of crashing the app. This is
- * an acceptable degradation: the settings screen's own copy already says blocking still works
- * without it, just via a 1-2 second poll instead of the accessibility service.
+ * the stock Clock app). In practice this isn't reliable: on API 31+ SCHEDULE_EXACT_ALARM is
+ * user-toggleable special app access, revocable at any time, and at least one OEM (Oplus/ColorOS's
+ * AlarmManagerService) enforces the check even for setAlarmClock with a SecurityException that
+ * isn't documented anywhere in stock Android. [scheduleWakeAlarm] below short-circuits when
+ * [Permissions.hasExactAlarm] is false and records the outcome via
+ * [SleepPrefs.setAlarmSchedulingFailed] either way, so SettingsScreen can surface a fix-it row
+ * instead of the alarm just silently never firing.
  */
 object AlarmScheduler {
 
@@ -28,6 +31,7 @@ object AlarmScheduler {
 
         if (!SleepPrefs.isEnabled(appContext)) {
             runCatching { am.cancel(pendingIntent) }
+                .onFailure { Log.e("AlarmScheduler", "Couldn't cancel wake alarm", it) }
             return
         }
 
@@ -45,7 +49,7 @@ object AlarmScheduler {
             Intent(appContext, com.secondbrain.lock.MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        runCatching { am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, showIntent), pendingIntent) }
+        scheduleWakeAlarm(appContext, am, triggerAt, showIntent, pendingIntent)
     }
 
     /** One-off snooze — doesn't touch the recurring daily schedule. */
@@ -59,7 +63,7 @@ object AlarmScheduler {
             Intent(appContext, com.secondbrain.lock.MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        runCatching { am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, showIntent), alarmPendingIntent(appContext)) }
+        scheduleWakeAlarm(appContext, am, triggerAt, showIntent, alarmPendingIntent(appContext))
     }
 
     /** One-off "wake me at this time instead" from the wake flow's own time picker — also
@@ -74,7 +78,31 @@ object AlarmScheduler {
             Intent(appContext, com.secondbrain.lock.MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        runCatching { am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, showIntent), alarmPendingIntent(appContext)) }
+        scheduleWakeAlarm(appContext, am, triggerAt, showIntent, alarmPendingIntent(appContext))
+    }
+
+    /** Shared by all three scheduling call sites: short-circuits before ever touching AlarmManager
+     * if the exact-alarm permission is (now) missing — [Permissions.hasExactAlarm] is revocable at
+     * any moment, so this is checked live rather than cached — and otherwise records whether the
+     * call actually succeeded, instead of the previous bare `runCatching` that discarded failures
+     * (including the ColorOS SecurityException noted above) with no trace anywhere. */
+    private fun scheduleWakeAlarm(
+        context: Context,
+        am: AlarmManager,
+        triggerAt: Long,
+        showIntent: PendingIntent,
+        pendingIntent: PendingIntent
+    ) {
+        if (!Permissions.hasExactAlarm(context)) {
+            SleepPrefs.setAlarmSchedulingFailed(context, true)
+            return
+        }
+        runCatching { am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, showIntent), pendingIntent) }
+            .onSuccess { SleepPrefs.setAlarmSchedulingFailed(context, false) }
+            .onFailure { e ->
+                Log.e("AlarmScheduler", "Couldn't schedule wake alarm", e)
+                SleepPrefs.setAlarmSchedulingFailed(context, true)
+            }
     }
 
     private fun alarmPendingIntent(context: Context): PendingIntent =

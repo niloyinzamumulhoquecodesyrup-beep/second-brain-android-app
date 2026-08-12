@@ -11,6 +11,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- User-toggleable special app access, not USE_EXACT_ALARM: this app's core function is task
+         management, not an alarm clock/calendar, so USE_EXACT_ALARM's auto-grant risks a Play
+         policy rejection. See util/Permissions.kt hasExactAlarm/exactAlarmIntent. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
@@ -58,6 +62,10 @@
 
         <receiver
             android:name=".service.WakeAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".receiver.ReminderAlarmReceiver"
             android:exported="false" />
 
         <service

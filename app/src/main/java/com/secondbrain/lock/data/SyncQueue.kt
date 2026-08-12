@@ -6,9 +6,12 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.secondbrain.lock.data.repo.NotesRepository
 import com.secondbrain.lock.data.repo.TasksRepository
 import com.secondbrain.lock.network.ApiClient
+import com.secondbrain.lock.network.dto.CreateNoteRequest
 import com.secondbrain.lock.network.dto.CreateTaskRequest
+import com.secondbrain.lock.network.dto.Note
 import com.secondbrain.lock.network.dto.Task
 import com.secondbrain.lock.network.dto.UpdateTaskRequest
 import java.util.UUID
@@ -36,13 +39,13 @@ object SyncQueue {
         scheduleFlush()
     }
 
-    /** Drops a queued create_task (and any update/delete queued against that same never-synced
-     * localId) — used when a task is deleted before it ever reached the server, so it's simply
-     * never sent instead of being created then immediately deleted. */
+    /** Drops a queued create_task/create_note (and any update/delete queued against that same
+     * never-synced localId) — used when a task or note is deleted before it ever reached the
+     * server, so it's simply never sent instead of being created then immediately deleted. */
     suspend fun cancelPendingCreate(localId: String) {
         val current = LocalCache.load<List<PendingOp>>(CACHE_KEY).orEmpty()
         val remaining = current.filterNot {
-            (it.type == PendingOp.TYPE_CREATE_TASK && it.localId == localId) ||
+            ((it.type == PendingOp.TYPE_CREATE_TASK || it.type == PendingOp.TYPE_CREATE_NOTE) && it.localId == localId) ||
                 ((it.type == PendingOp.TYPE_UPDATE_TASK || it.type == PendingOp.TYPE_DELETE_TASK) && it.taskId == localId)
         }
         LocalCache.save(CACHE_KEY, remaining)
@@ -55,11 +58,25 @@ object SyncQueue {
         WorkManager.getInstance(appContext).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
     }
 
-    /** Replays queued ops in order, stopping at the first failure so ordering/consistency is
-     * preserved — WorkManager's own backoff retries the remaining batch later. */
-    suspend fun flush() {
+    /**
+     * Replays queued ops in order, stopping at the first NETWORK failure so ordering/consistency
+     * is preserved (an update must never apply before its own create) — WorkManager's own backoff
+     * retries the remaining batch later, driven by this function's return value.
+     *
+     * A structurally malformed op (missing a field its type requires) is a different case: no
+     * amount of retrying will ever make it succeed, so it's dropped from the queue outright rather
+     * than left in place. Leaving it in place would both poison the queue forever (retried and
+     * skipped on every future flush) AND let every op after it run out of order, since a bare
+     * `continue` skips removal without breaking. Malformed => drop and keep going. Network failure
+     * => stop and preserve order.
+     *
+     * @return true if the queue fully drained (or was already empty); false if it stopped early
+     * with ops still remaining, in which case [SyncQueueWorker.doWork] should ask WorkManager to
+     * retry.
+     */
+    suspend fun flush(): Boolean {
         val ops = LocalCache.load<List<PendingOp>>(CACHE_KEY).orEmpty().sortedBy { it.createdAt }
-        if (ops.isEmpty()) return
+        if (ops.isEmpty()) return true
 
         val resolvedIds = mutableMapOf<String, String>()
         val remaining = ops.toMutableList()
@@ -68,8 +85,12 @@ object SyncQueue {
             val resolvedTaskId = op.taskId?.let { resolvedIds[it] ?: it }
             val succeeded = when (op.type) {
                 PendingOp.TYPE_CREATE_TASK -> {
-                    val create = op.create ?: continue
-                    val localId = op.localId ?: continue
+                    val create = op.create
+                    val localId = op.localId
+                    if (create == null || localId == null) {
+                        remaining.remove(op)
+                        continue
+                    }
                     ApiClient.postTyped<CreateTaskRequest, Task>("/api/tasks", create)
                         .onSuccess { real ->
                             resolvedIds[localId] = real.id
@@ -78,22 +99,53 @@ object SyncQueue {
                         .isSuccess
                 }
                 PendingOp.TYPE_UPDATE_TASK -> {
-                    val update = op.update ?: continue
-                    val id = resolvedTaskId ?: continue
+                    val update = op.update
+                    val id = resolvedTaskId
+                    if (update == null || id == null) {
+                        remaining.remove(op)
+                        continue
+                    }
                     ApiClient.putTyped<UpdateTaskRequest, Task>("/api/tasks/$id", update)
                         .onSuccess { real -> TasksRepository.resolveLocalTask(id, real) }
                         .isSuccess
                 }
                 PendingOp.TYPE_DELETE_TASK -> {
-                    val id = resolvedTaskId ?: continue
+                    val id = resolvedTaskId
+                    if (id == null) {
+                        remaining.remove(op)
+                        continue
+                    }
                     ApiClient.deleteRaw("/api/tasks/$id").isSuccess
                 }
                 PendingOp.TYPE_LOG_FOCUS_ACTIVITY -> {
-                    val mode = op.mode ?: continue
-                    val minutes = op.minutes ?: continue
+                    val mode = op.mode
+                    val minutes = op.minutes
+                    if (mode == null || minutes == null) {
+                        remaining.remove(op)
+                        continue
+                    }
                     ApiClient.postFocusActivity(mode, minutes, resolvedTaskId, null).isSuccess
                 }
-                else -> true
+                PendingOp.TYPE_CREATE_NOTE -> {
+                    val create = op.createNote
+                    val localId = op.localId
+                    if (create == null || localId == null) {
+                        remaining.remove(op)
+                        continue
+                    }
+                    ApiClient.postTyped<CreateNoteRequest, Note>("/api/notes", create)
+                        .onSuccess { real ->
+                            resolvedIds[localId] = real.id
+                            NotesRepository.resolveLocalNote(localId, real)
+                        }
+                        .isSuccess
+                }
+                else -> {
+                    // Unrecognized op type (e.g. written by a newer app version) — can't be
+                    // replayed here either, so drop it rather than looping on it forever.
+                    remaining.remove(op)
+                    continue
+                }
             }
             if (succeeded) {
                 remaining.remove(op)
@@ -103,6 +155,7 @@ object SyncQueue {
         }
 
         LocalCache.save(CACHE_KEY, remaining)
+        return remaining.isEmpty()
     }
 
     fun newOpId(): String = UUID.randomUUID().toString()

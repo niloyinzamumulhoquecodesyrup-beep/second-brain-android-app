@@ -1,5 +1,6 @@
 package com.secondbrain.lock.util
 
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -44,6 +45,21 @@ object Permissions {
     fun hasCamera(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
+
+    /** User-toggleable "special app access" on API 31+ (Settings -> Apps -> Special app access ->
+     * Alarms & reminders), auto-granted below that. Revocable at any time — the OS kills this
+     * process when the user flips it off, so callers must check live at scheduling time rather
+     * than caching the result. Deliberately NOT folded into [allGranted]: Shield's onboarding
+     * gates its Continue button on that function, and Shield's app-blocking works fine without
+     * exact alarms — this is wired into its own optional onboarding step instead. */
+    fun hasExactAlarm(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        val am = context.getSystemService(AlarmManager::class.java) ?: return false
+        return am.canScheduleExactAlarms()
+    }
+
+    fun exactAlarmIntent(context: Context): Intent =
+        Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))
 
     fun allGranted(context: Context): Boolean =
         hasOverlay(context) && hasUsageAccess(context) && hasNotifications(context)

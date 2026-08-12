@@ -18,7 +18,10 @@ data class Note(
     val pinned: Boolean = false,
     val graduated: Boolean = false,
     @SerialName("created_at") val createdAt: String? = null,
-    @SerialName("updated_at") val updatedAt: String? = null
+    @SerialName("updated_at") val updatedAt: String? = null,
+    /** Local-only: true while this note (or an edit to it) is queued in [com.secondbrain.lock.data.SyncQueue]
+     * waiting for connectivity. Never sent to or set by the server. */
+    val pendingSync: Boolean = false
 )
 
 @Serializable

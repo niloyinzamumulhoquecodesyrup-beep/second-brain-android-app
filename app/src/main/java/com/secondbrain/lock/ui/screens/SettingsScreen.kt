@@ -55,7 +55,10 @@ fun SettingsScreen(
     useRoutineSleepWindow: Boolean,
     onToggleUseRoutine: (Boolean) -> Unit,
     wakeMinuteOfDay: Int,
-    onWakeMinuteChange: (Int) -> Unit
+    onWakeMinuteChange: (Int) -> Unit,
+    exactAlarmGranted: Boolean,
+    alarmSchedulingFailed: Boolean,
+    onFixExactAlarm: () -> Unit
 ) {
     Column(modifier = Modifier.fullAuraBackground().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 28.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -131,6 +134,27 @@ fun SettingsScreen(
                 sleepAlarmEnabled,
                 onToggleSleepAlarm
             )
+            if (sleepAlarmEnabled && (!exactAlarmGranted || alarmSchedulingFailed)) {
+                Spacer(Modifier.height(18.dp))
+                Column {
+                    Text(
+                        "Alarms can't be scheduled",
+                        style = SecondBrainTypography.titleMedium,
+                        color = StreakAccent
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Android needs permission to set exact alarms.",
+                        style = SecondBrainTypography.bodySmall,
+                        color = Mist300
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = onFixExactAlarm,
+                        colors = ButtonDefaults.buttonColors(containerColor = StreakAccent.copy(alpha = 0.15f), contentColor = StreakAccent)
+                    ) { Text("Fix this") }
+                }
+            }
             if (sleepAlarmEnabled) {
                 Spacer(Modifier.height(18.dp))
                 SettingsToggleRow(

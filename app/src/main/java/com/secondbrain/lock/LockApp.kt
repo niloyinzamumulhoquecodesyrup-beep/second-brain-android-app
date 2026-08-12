@@ -22,6 +22,7 @@ import com.secondbrain.lock.data.repo.StatsRepository
 import com.secondbrain.lock.data.repo.TasksRepository
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.service.Overlays
+import com.secondbrain.lock.service.ReminderScheduler
 import com.secondbrain.lock.ui.theme.SbThemeState
 import com.secondbrain.lock.ui.theme.ThemeMode
 import com.secondbrain.lock.widget.SectographUpdateWorker
@@ -51,6 +52,8 @@ class LockApp : Application() {
             StatsRepository.restore()
             TasksRepository.restore()
         }
+        ReminderScheduler.init(this)
+        ReminderScheduler.rescheduleAll()
         // Runs immediately if a network is already up, or waits for one via WorkManager's
         // NetworkType.CONNECTED constraint — replays anything SyncQueue queued last session while
         // offline (task creates/edits, focus-activity logs) that never made it to the server.
@@ -103,6 +106,43 @@ class LockApp : Application() {
                     )
                 }
             )
+            val notificationSound = Uri.parse("android.resource://$packageName/raw/notification")
+            val notificationAudioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    TASK_CHANNEL_ID,
+                    "Task reminders",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Reminds you when a task is scheduled to start"
+                    setSound(notificationSound, notificationAudioAttributes)
+                }
+            )
+            // Ongoing/colorized escalation tier (P4) — not swipeable, used once a reminder has
+            // been snoozed past a threshold. Declared now so the channel exists ahead of that work.
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    PERSIST_CHANNEL_ID,
+                    "Persistent reminders",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "An ongoing reminder for a task that needs your attention, until you act on it"
+                    setSound(notificationSound, notificationAudioAttributes)
+                }
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    NUDGE_CHANNEL_ID,
+                    "Gentle nudges",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "Occasional low-priority suggestions"
+                    enableVibration(false)
+                }
+            )
         }
     }
 
@@ -110,5 +150,8 @@ class LockApp : Application() {
         const val MONITOR_CHANNEL_ID = "monitor_service"
         const val WARNING_CHANNEL_ID = "usage_warning"
         const val ALARM_CHANNEL_ID = "wake_alarm"
+        const val TASK_CHANNEL_ID = "task_reminder"
+        const val PERSIST_CHANNEL_ID = "persistent_nudge"
+        const val NUDGE_CHANNEL_ID = "gentle_nudge"
     }
 }
