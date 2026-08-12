@@ -23,7 +23,9 @@ class SectographUpdateWorker(context: Context, params: WorkerParameters) : Corou
         private const val PERIODIC_WORK_NAME = "sectograph_periodic_refresh"
 
         fun schedulePeriodic(context: Context) {
-            val request = PeriodicWorkRequestBuilder<SectographUpdateWorker>(30, TimeUnit.MINUTES).build()
+            // 15 minutes is WorkManager's own hard floor for PeriodicWorkRequest — cannot go
+            // lower (P18).
+            val request = PeriodicWorkRequestBuilder<SectographUpdateWorker>(15, TimeUnit.MINUTES).build()
             WorkManager.getInstance(context)
                 .enqueueUniquePeriodicWork(PERIODIC_WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
         }

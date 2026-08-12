@@ -100,6 +100,7 @@ fun RoutinePlanner() {
     val routines by PlannerRepository.routines.collectAsState()
     val error by PlannerRepository.error.collectAsState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var routineAnswer by remember { mutableStateOf("") }
     var routineAnswerSent by remember { mutableStateOf(false) }
@@ -181,6 +182,10 @@ fun RoutinePlanner() {
                                         source = "starter"
                                     )
                                 )
+                                // P18: the sectograph draws from RoutineRepository's separate
+                                // Room cache, not this StateFlow — without this it'd show stale
+                                // arcs until its own periodic refresh caught up.
+                                com.secondbrain.lock.widget.SectographUpdateWorker.requestImmediateUpdate(context)
                             }
                         },
                         label = { Text("+ ${starter.title}") },
@@ -201,23 +206,40 @@ fun RoutinePlanner() {
                     editingRoutineId = null
                     scope.launch {
                         PlannerRepository.updateRoutine(routine.id, UpdatePlannerRoutineRequest(startMin = startMin, durationMin = durationMin))
+                        com.secondbrain.lock.widget.SectographUpdateWorker.requestImmediateUpdate(context)
                     }
                 },
                 onToggleActive = {
-                    scope.launch { PlannerRepository.updateRoutine(routine.id, UpdatePlannerRoutineRequest(active = !routine.active)) }
+                    scope.launch {
+                        PlannerRepository.updateRoutine(routine.id, UpdatePlannerRoutineRequest(active = !routine.active))
+                        com.secondbrain.lock.widget.SectographUpdateWorker.requestImmediateUpdate(context)
+                    }
                 },
                 onToggleDay = { day ->
                     val next = if (routine.days.contains(day)) routine.days - day else (routine.days + day).sorted()
                     if (next.isNotEmpty()) {
-                        scope.launch { PlannerRepository.updateRoutine(routine.id, UpdatePlannerRoutineRequest(days = next)) }
+                        scope.launch {
+                            PlannerRepository.updateRoutine(routine.id, UpdatePlannerRoutineRequest(days = next))
+                            com.secondbrain.lock.widget.SectographUpdateWorker.requestImmediateUpdate(context)
+                        }
                     }
                 },
-                onDelete = { scope.launch { PlannerRepository.deleteRoutine(routine.id) } }
+                onDelete = {
+                    scope.launch {
+                        PlannerRepository.deleteRoutine(routine.id)
+                        com.secondbrain.lock.widget.SectographUpdateWorker.requestImmediateUpdate(context)
+                    }
+                }
             )
         }
 
         Spacer(Modifier.height(12.dp))
-        NewRoutineForm(onCreate = { request -> scope.launch { PlannerRepository.createRoutine(request) } })
+        NewRoutineForm(onCreate = { request ->
+            scope.launch {
+                PlannerRepository.createRoutine(request)
+                com.secondbrain.lock.widget.SectographUpdateWorker.requestImmediateUpdate(context)
+            }
+        })
     }
 }
 

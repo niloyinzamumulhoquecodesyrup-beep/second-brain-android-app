@@ -323,7 +323,10 @@ private fun TodayTimelineList(
                     onFocus = { onFocusTask(item.task) },
                     onDelete = { onDeleteTask(item.task) },
                     onLongPress = { breakdownController.request(item.task) },
-                    onBreakdownClick = { breakdownController.request(item.task) }
+                    onBreakdownClick = { breakdownController.request(item.task) },
+                    activeWindow = if (item.isHappeningNow(nowMinute) && item.task.startMin != null) {
+                        item.task.startMin!! to (item.task.durationMin ?: 0)
+                    } else null
                 )
                 if (breakdownController.taskId == item.task.id) {
                     TaskBreakdownBlock(breakdownController)
@@ -343,7 +346,10 @@ private fun TodayTimelineList(
                 truncateTitle = false,
                 onToggle = { onToggleRoutine(item, item.block?.status != "done") },
                 onFocus = { onFocusRoutine(item) },
-                onDelete = null
+                onDelete = null,
+                activeWindow = if (item.isHappeningNow(nowMinute) && item.startMin != null) {
+                    item.startMin!! to (item.durationMinutes ?: 0)
+                } else null
             )
         }
     }

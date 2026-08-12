@@ -1,7 +1,9 @@
 package com.secondbrain.lock.ui.screens.work
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -133,7 +135,15 @@ fun WorkScreen(
             Box(Modifier.fillMaxWidth().fullBleed(16.dp)) {
                 TimeBar()
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
+            // P18: promoted from the home-screen widget — kept inline in the scroll flow rather
+            // than an overlay Box, since an overlay sibling over this same scrolling Column has
+            // previously swallowed taps here (see FocusPomodoroDialog's close-icon KDoc for the
+            // exact failure mode).
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                SectographInline()
+            }
+            Spacer(Modifier.height(4.dp))
             // P16: "what do I do" answered directly, one card, before anything else — including
             // MorningBriefSection, which is informational rather than an action.
             NowCard(

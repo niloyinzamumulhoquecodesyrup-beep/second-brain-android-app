@@ -44,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -199,6 +200,16 @@ internal fun currentMinuteOfDay(): Int = LocalTime.now().let { it.hour * 60 + it
  * than read via `LocalTime.now()` here) because a plain wall-clock read wouldn't ever trigger a
  * recomposition on its own — callers hold it in a ticking `remember`d state instead so the
  * "current" dot actually updates as time passes, not just when unrelated state changes. */
+/** Elapsed fraction of [startMin]..[startMin]+[durationMin], with the same overnight-wrap
+ * handling as [isCurrentNow] — deliberately NOT coerced to [0,1] so a caller can tell "still
+ * running, almost done" (near 1) apart from "running over" (past 1) if it ever needs to. */
+internal fun elapsedFraction(startMin: Int, durationMin: Int, nowMin: Int): Float {
+    if (durationMin <= 0) return 1f
+    val endMin = startMin + durationMin
+    val elapsed = if (endMin <= 1440 || nowMin >= startMin) nowMin - startMin else nowMin + 1440 - startMin
+    return elapsed.toFloat() / durationMin
+}
+
 internal fun isCurrentNow(startMin: Int?, durationMin: Int?, nowMin: Int): Boolean {
     if (startMin == null) return false
     val duration = durationMin ?: 0
@@ -474,7 +485,11 @@ fun TasksPanel(
                             onLongPress = { breakdownController.request(item.task) },
                             // Same handler as long-press (P13) — the ⋮ menu is the discoverable
                             // entry point, long-press stays as the power-user shortcut.
-                            onBreakdownClick = { breakdownController.request(item.task) }
+                            onBreakdownClick = { breakdownController.request(item.task) },
+                            // P18: only the row actually happening right now gets a fill.
+                            activeWindow = if (item.isHappeningNow(nowMinute) && item.task.startMin != null) {
+                                item.task.startMin!! to (item.task.durationMin ?: 0)
+                            } else null
                         )
                         if (breakdownController.taskId == item.task.id) {
                             TaskBreakdownBlock(breakdownController)
@@ -495,10 +510,13 @@ fun TasksPanel(
                         onToggle = { toggleRoutineDone(item, item.block?.status != "done") },
                         onFocus = { openRoutineFocus(item) },
                         onDelete = null,
-                        onLongPress = { Toast.makeText(context, "Task breakdown isn't available for routines", Toast.LENGTH_SHORT).show() }
+                        onLongPress = { Toast.makeText(context, "Task breakdown isn't available for routines", Toast.LENGTH_SHORT).show() },
                         // No onBreakdownClick: unlike long-press (a long-standing, low-visibility
                         // shortcut), a menu item that always shows "not available" is dead UI —
                         // don't render the ⋮ affordance at all for routines.
+                        activeWindow = if (item.isHappeningNow(nowMinute) && item.startMin != null) {
+                            item.startMin!! to (item.durationMinutes ?: 0)
+                        } else null
                     )
                 }
             }
@@ -560,7 +578,10 @@ internal fun TimelineRow(
     // P13: a ⋮ "Break it down" menu item, shown only when non-null — long-press (above) reaches
     // the identical flow but is undiscoverable; this is the menu equivalent, not a second flow.
     onBreakdownClick: (() -> Unit)? = null,
-    dimmed: Boolean = false
+    dimmed: Boolean = false,
+    // P18: (startMin, durationMin) when this row isHappeningNow — drives a left-to-right fill
+    // that visibly drains over the block's duration. null for every other row (most of them).
+    activeWindow: Pair<Int, Int>? = null
 ) {
     val requester = remember { BringIntoViewRequester() }
     LaunchedEffect(highlighted) { if (highlighted) requester.bringIntoView() }
@@ -592,7 +613,7 @@ internal fun TimelineRow(
             }
         }
         Spacer(Modifier.width(8.dp))
-        Row(
+        Box(
             modifier = Modifier
                 .weight(1f)
                 .padding(bottom = 8.dp)
@@ -602,75 +623,97 @@ internal fun TimelineRow(
                     if (highlighted) Modifier.border(BorderStroke(1.dp, Emerald400), RoundedCornerShape(16.dp))
                     else Modifier
                 )
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(
-                        when {
-                            dimmed -> Ink600.copy(alpha = 0.35f)
-                            icon == RowIcon.ROUTINE -> Gold500.copy(alpha = 0.2f)
-                            else -> StreakAccent.copy(alpha = 0.18f)
-                        }
-                    ),
-                contentAlignment = Alignment.Center
-            ) { Text(if (icon == RowIcon.ROUTINE) "🔁" else "🔔", fontSize = 14.sp) }
-
-            Spacer(Modifier.width(10.dp))
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .then(
-                        if (onLongPress != null) {
-                            Modifier.pointerInput(onLongPress) {
-                                detectTapGestures(onLongPress = {
-                                    FeedbackUtil.longPressTick(context)
-                                    onLongPress()
-                                })
-                            }
-                        } else Modifier
-                    )
-            ) {
-                Text(
-                    title,
-                    color = if (done || dimmed) Mist400 else Mist100,
-                    style = SecondBrainTypography.bodyMedium,
-                    textDecoration = if (done) TextDecoration.LineThrough else null,
-                    maxLines = if (truncateTitle) 1 else Int.MAX_VALUE,
-                    overflow = if (truncateTitle) TextOverflow.Ellipsis else TextOverflow.Clip
+            // P18: the row currently happening visibly drains left-to-right over its own
+            // duration. Ticks on its own 1s timer via produceState — scoped to just this row,
+            // never the panel — so the other N-1 rows (and TasksPanel itself) don't recompose
+            // every second for one row's animation.
+            if (activeWindow != null) {
+                val (startMin, durationMin) = activeWindow
+                val fill by produceState(elapsedFraction(startMin, durationMin, currentMinuteOfDay()), startMin, durationMin) {
+                    while (true) {
+                        value = elapsedFraction(startMin, durationMin, currentMinuteOfDay())
+                        delay(1000)
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(fill.coerceIn(0f, 1f))
+                        .background(bg.copy(alpha = 0.35f))
                 )
-                Text(subtitle, color = subtitleColor, style = SecondBrainTypography.bodySmall)
             }
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when {
+                                dimmed -> Ink600.copy(alpha = 0.35f)
+                                icon == RowIcon.ROUTINE -> Gold500.copy(alpha = 0.2f)
+                                else -> StreakAccent.copy(alpha = 0.18f)
+                            }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) { Text(if (icon == RowIcon.ROUTINE) "🔁" else "🔔", fontSize = 14.sp) }
 
-            if (onFocus != null) {
-                IconButton(onClick = onFocus) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "Start focus", tint = Violet400)
-                }
-            }
-            if (onBreakdownClick != null) {
-                var menuExpanded by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "More actions", tint = Mist400)
-                    }
-                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Break it down") },
-                            onClick = { menuExpanded = false; onBreakdownClick() }
+                Spacer(Modifier.width(10.dp))
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(
+                            if (onLongPress != null) {
+                                Modifier.pointerInput(onLongPress) {
+                                    detectTapGestures(onLongPress = {
+                                        FeedbackUtil.longPressTick(context)
+                                        onLongPress()
+                                    })
+                                }
+                            } else Modifier
                         )
+                ) {
+                    Text(
+                        title,
+                        color = if (done || dimmed) Mist400 else Mist100,
+                        style = SecondBrainTypography.bodyMedium,
+                        textDecoration = if (done) TextDecoration.LineThrough else null,
+                        maxLines = if (truncateTitle) 1 else Int.MAX_VALUE,
+                        overflow = if (truncateTitle) TextOverflow.Ellipsis else TextOverflow.Clip
+                    )
+                    Text(subtitle, color = subtitleColor, style = SecondBrainTypography.bodySmall)
+                }
+
+                if (onFocus != null) {
+                    IconButton(onClick = onFocus) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = "Start focus", tint = Violet400)
                     }
                 }
-            }
-            if (onToggle != null) {
-                ToggleCircle(done = done, onClick = onToggle)
-            }
-            if (onDelete != null) {
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Close, contentDescription = "Delete task", tint = Mist400)
+                if (onBreakdownClick != null) {
+                    var menuExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "More actions", tint = Mist400)
+                        }
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Break it down") },
+                                onClick = { menuExpanded = false; onBreakdownClick() }
+                            )
+                        }
+                    }
+                }
+                if (onToggle != null) {
+                    ToggleCircle(done = done, onClick = onToggle)
+                }
+                if (onDelete != null) {
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Close, contentDescription = "Delete task", tint = Mist400)
+                    }
                 }
             }
         }
