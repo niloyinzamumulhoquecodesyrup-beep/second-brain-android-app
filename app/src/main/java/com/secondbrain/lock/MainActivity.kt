@@ -54,8 +54,7 @@ import com.secondbrain.lock.ui.nav.AppNavHost
 import com.secondbrain.lock.ui.nav.BottomBar
 import com.secondbrain.lock.ui.nav.Destination
 import com.secondbrain.lock.ui.nav.MINDVERSE_ROOM_ROUTE
-import com.secondbrain.lock.ui.nav.QuickAddChooserSheet
-import com.secondbrain.lock.ui.nav.QuickAddTaskSheet
+import com.secondbrain.lock.ui.nav.FastCaptureSheet
 import com.secondbrain.lock.ui.nav.TopBar
 import com.secondbrain.lock.ui.nav.VoiceTranscriptBubble
 import com.secondbrain.lock.ui.screens.AccountSettingsScreen
@@ -192,7 +191,8 @@ private fun RootApp() {
         )
     }
 
-    var quickAddStep by remember { mutableStateOf<QuickAddStep?>(null) }
+    var showFastCapture by remember { mutableStateOf(false) }
+    var showFullCapture by remember { mutableStateOf(false) }
 
     // The Mindverse room is a full-screen call takeover (its own camera-grid/controls bottom
     // chrome) — showing the app's own bottom nav bar underneath it as well would double up on
@@ -205,7 +205,7 @@ private fun RootApp() {
             containerColor = Color.Transparent,
             bottomBar = {
                 if (!inMindverseRoom) {
-                    BottomBar(navController, onAddClick = { quickAddStep = QuickAddStep.CHOOSER })
+                    BottomBar(navController, onAddClick = { showFastCapture = true })
                 }
             }
         ) { padding ->
@@ -225,21 +225,21 @@ private fun RootApp() {
             )
         }
 
-        when (quickAddStep) {
-            QuickAddStep.CHOOSER -> QuickAddChooserSheet(
-                onDismiss = { quickAddStep = null },
-                onPickTask = { quickAddStep = QuickAddStep.TASK },
-                onPickCapture = { quickAddStep = QuickAddStep.CAPTURE }
+        if (showFastCapture) {
+            FastCaptureSheet(
+                onDismiss = { showFastCapture = false },
+                // Deliberately does NOT close the sheet — burst-capture (save, save, save) is
+                // the whole point; only the explicit dismiss above or the full-capture handoff
+                // below should ever close it.
+                onCaptured = {},
+                onOpenFullCapture = { showFastCapture = false; showFullCapture = true }
             )
-            QuickAddStep.TASK -> QuickAddTaskSheet(
-                onDismiss = { quickAddStep = null },
-                onCreated = { quickAddStep = null }
+        }
+        if (showFullCapture) {
+            CaptureSheet(
+                onDismiss = { showFullCapture = false },
+                onCaptured = { showFullCapture = false }
             )
-            QuickAddStep.CAPTURE -> CaptureSheet(
-                onDismiss = { quickAddStep = null },
-                onCaptured = { quickAddStep = null }
-            )
-            null -> {}
         }
 
         VoiceTranscriptBubble(
@@ -249,8 +249,6 @@ private fun RootApp() {
         )
     }
 }
-
-private enum class QuickAddStep { CHOOSER, TASK, CAPTURE }
 
 /** The native onboarding + app-limit dashboard flow, now living under the Shield tab. */
 @Composable
