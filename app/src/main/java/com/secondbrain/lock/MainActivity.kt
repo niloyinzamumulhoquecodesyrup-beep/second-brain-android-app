@@ -205,7 +205,10 @@ private fun RootApp() {
             containerColor = Color.Transparent,
             bottomBar = {
                 if (!inMindverseRoom) {
-                    BottomBar(navController, onAddClick = { showFastCapture = true })
+                    // `voice` is unused until P12 wires real listening into FastCaptureSheet —
+                    // both tap and long-press just open the sheet for now, per P6a's own explicit
+                    // fallback for exactly this ordering.
+                    BottomBar(navController, onCapture = { _ -> showFastCapture = true })
                 }
             }
         ) { padding ->
