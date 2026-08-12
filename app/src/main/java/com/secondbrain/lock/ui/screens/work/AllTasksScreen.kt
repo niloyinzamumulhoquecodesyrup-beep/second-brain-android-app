@@ -53,7 +53,7 @@ import com.secondbrain.lock.ui.theme.Ink950
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
-import com.secondbrain.lock.ui.theme.Red400
+import com.secondbrain.lock.ui.theme.Mist500
 import com.secondbrain.lock.ui.theme.SbCard
 import com.secondbrain.lock.ui.theme.SbLabel
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
@@ -101,7 +101,6 @@ fun AllTasksScreen(
     val weekTasks = remember(open, today, weekEnd) { open.filter { val d = dueDateOf(it); d != null && d > today && d <= weekEnd } }
     val monthTasks = remember(open, weekEnd) { open.filter { val d = dueDateOf(it); d != null && d > weekEnd } }
     val draftTasks = remember(open, today) { open.filter { isDraftTask(it, today) } }
-    val overdueTasks = remember(open, today) { open.filter { isOverdueTask(it, today) } }
     val combinedToday = remember(todayTasks, routines, plannerToday, nowMinute) { buildTodayItems(todayTasks, routines, plannerToday, nowMinute) }
     val suggestions = remember(queueItems) {
         queueItems.mapNotNull { item -> item.taskSuggestionTitle()?.let { title -> item to title } }
@@ -180,10 +179,9 @@ fun AllTasksScreen(
                     TasksTab.WEEK -> TaskTimelineList(weekTasks, nowMinute = nowMinute, onToggle = { toggleDone(it, true) }, onFocus = { focusTask = it }, onDelete = ::deleteTask)
                     TasksTab.MONTH -> TaskTimelineList(monthTasks, nowMinute = nowMinute, onToggle = { toggleDone(it, true) }, onFocus = { focusTask = it }, onDelete = ::deleteTask)
                     TasksTab.MORE -> {
-                        SbLabel("Overdue", color = Red400)
-                        Spacer(Modifier.height(10.dp))
-                        TaskTimelineList(overdueTasks, nowMinute = nowMinute, onToggle = { toggleDone(it, true) }, onFocus = { focusTask = it }, onDelete = ::deleteTask)
-                        Spacer(Modifier.height(20.dp))
+                        // P8: no separate Overdue section — those tasks now surface in the TODAY
+                        // tab instead (isTodayTask includes due <= today), so a duplicate listing
+                        // here would show the same task twice.
                         SbLabel("Drafts", color = Mist400)
                         Spacer(Modifier.height(10.dp))
                         TaskTimelineList(draftTasks, nowMinute = nowMinute, onToggle = { toggleDone(it, true) }, onFocus = { focusTask = it }, onDelete = ::deleteTask)
@@ -304,7 +302,7 @@ private fun TodayTimelineList(
                     icon = RowIcon.TASK,
                     title = item.task.title,
                     subtitle = if (item.task.pendingSync) "Syncing… · ${info.text}" else info.text,
-                    subtitleColor = if (info.overdue) Red400 else Mist300,
+                    subtitleColor = if (info.overdue) Mist500 else Mist300,
                     bg = rowBg(index),
                     dotColor = dotColor,
                     showLineAbove = !isFirst,
@@ -355,7 +353,7 @@ private fun TaskTimelineList(
             icon = RowIcon.TASK,
             title = task.title,
             subtitle = if (task.pendingSync) "Syncing… · ${info.text}" else info.text,
-            subtitleColor = if (info.overdue) Red400 else Mist300,
+            subtitleColor = if (info.overdue) Mist500 else Mist300,
             bg = rowBg(index),
             dotColor = if (isCurrentNow(task.startMin, task.durationMin, nowMinute)) StreakAccent else StreakSilver,
             showLineAbove = index != 0,

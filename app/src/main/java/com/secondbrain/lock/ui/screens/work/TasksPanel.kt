@@ -81,7 +81,7 @@ import com.secondbrain.lock.ui.theme.Ink950
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.Mist400
-import com.secondbrain.lock.ui.theme.Red400
+import com.secondbrain.lock.ui.theme.Mist500
 import com.secondbrain.lock.ui.theme.Rose400
 import com.secondbrain.lock.ui.theme.SbCard
 import com.secondbrain.lock.ui.theme.SbSectionTitle
@@ -111,14 +111,20 @@ internal fun createdDateOf(task: Task): LocalDate? =
     task.createdAt?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
 
 /** An undated task only belongs in "today" on the day it was captured — after that it's a
- * [isDraftTask], parked in AllTasksScreen's "More tasks" tab until it's scheduled. A task due
- * strictly before today is an [isOverdueTask] instead — overdue items no longer clutter Today,
- * they're parked in "More tasks" too until rescheduled or done. */
+ * [isDraftTask], parked in AllTasksScreen's "More tasks" tab until it's scheduled. A dated task
+ * belongs in Today from its due date onward — `due <= today`, not `due == today` — so an overdue
+ * task keeps surfacing where the user will actually see it instead of silently falling out of
+ * view. This is deliberately NOT a rewrite of due_date (that would destroy the original
+ * scheduling intent and fight across devices/clients); [isOverdueTask] below just annotates which
+ * of these rows are overdue so the UI can present them neutrally rather than excluding them. */
 internal fun isTodayTask(task: Task, today: LocalDate): Boolean {
     val due = dueDateOf(task)
-    return if (due != null) due == today else createdDateOf(task) == today
+    return if (due != null) due <= today else createdDateOf(task) == today
 }
 
+/** No longer used to exclude a task from Today (see [isTodayTask]) — only to flag which Today
+ * rows are overdue, so the UI can annotate them ("waiting since ...", no red) instead of hiding
+ * them in a separate section. */
 internal fun isOverdueTask(task: Task, today: LocalDate): Boolean {
     val due = dueDateOf(task)
     return due != null && due < today
@@ -158,7 +164,9 @@ internal fun taskSubtitleInfo(task: Task): TaskSubtitleInfo {
     val overdue = dueDateLocal != null && dueDateLocal < LocalDate.now() && !task.done
     val dateText = when {
         dueDateLocal == null -> "No due date"
-        overdue -> "overdue: ${formatDueDate(dueRaw!!)}"
+        // Neutral framing, no red, no exclamation — P8 treats an overdue task as information,
+        // not a failure. "waiting since ..." rather than "overdue: ...".
+        overdue -> "waiting since ${formatDueDate(dueRaw!!)}"
         else -> formatDueDate(dueRaw!!)
     }
     // A task with a chosen time (set via the quick-add sheet's "Time" picker) shows its window
@@ -569,7 +577,8 @@ fun TasksPanel(
                             icon = RowIcon.TASK,
                             title = item.task.title,
                             subtitle = if (isBreakingDown) "Breaking down…" else if (item.task.pendingSync) "Syncing… · ${info.text}" else info.text,
-                            subtitleColor = if (isBreakingDown) Mist400 else if (info.overdue) Red400 else Mist300,
+                            // P8: overdue is information, not a warning — Mist500, no red.
+                            subtitleColor = if (isBreakingDown) Mist400 else if (info.overdue) Mist500 else Mist300,
                             bg = rowBg(index),
                             dotColor = if (glowTaskId == item.task.id) StreakAccent else dotColor,
                             showLineAbove = !isFirst,
