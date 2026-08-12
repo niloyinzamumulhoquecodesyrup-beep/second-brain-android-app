@@ -5,11 +5,16 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [AppLimit::class, RoutineCache::class, CacheEntry::class], version = 3, exportSchema = false)
+@Database(
+    entities = [AppLimit::class, RoutineCache::class, CacheEntry::class, ReminderState::class],
+    version = 4,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun appLimitDao(): AppLimitDao
     abstract fun routineCacheDao(): RoutineCacheDao
     abstract fun cacheEntryDao(): CacheEntryDao
+    abstract fun reminderStateDao(): ReminderStateDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null

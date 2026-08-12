@@ -72,6 +72,24 @@ object ReminderScheduler {
         saveScheduledIds(upcoming.map { it.id }.toSet())
     }
 
+    /** One-off, used by [com.secondbrain.lock.receiver.ReminderActionReceiver]'s Snooze and "Too
+     * big" (first-subtask) paths — reuses [reminderId] as the request code, same as
+     * [rescheduleAll]'s own alarms, so this replaces rather than stacks a second pending alarm for
+     * the same reminder. Deliberately NOT routed through [rescheduleAll]'s task-list derivation —
+     * a snooze is a presentation-only re-fire, not a change to the underlying task's schedule. */
+    fun scheduleOneOff(reminderId: String, title: String, minutesFromNow: Int) {
+        val am = appContext.getSystemService(AlarmManager::class.java) ?: return
+        val triggerAt = System.currentTimeMillis() + minutesFromNow * 60_000L
+        val pendingIntent = reminderPendingIntent(reminderId, title)
+        if (Permissions.hasExactAlarm(appContext)) {
+            runCatching { am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent) }
+                .onFailure { Log.e(TAG, "Couldn't schedule snooze for $reminderId", it) }
+        } else {
+            runCatching { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent) }
+                .onFailure { Log.e(TAG, "Couldn't schedule inexact snooze for $reminderId", it) }
+        }
+    }
+
     private fun scheduleOne(am: AlarmManager, task: Task) {
         val startMin = task.startMin ?: return
         val triggerAt = todayAtMinuteMillis(startMin)

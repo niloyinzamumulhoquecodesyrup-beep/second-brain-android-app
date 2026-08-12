@@ -68,6 +68,10 @@
             android:name=".receiver.ReminderAlarmReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".receiver.ReminderActionReceiver"
+            android:exported="false" />
+
         <service
             android:name=".service.LockAccessibilityService"
             android:exported="false"
