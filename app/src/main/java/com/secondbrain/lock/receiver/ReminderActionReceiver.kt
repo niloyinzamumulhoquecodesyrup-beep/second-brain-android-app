@@ -101,7 +101,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun postFallback(context: Context, reminderId: String, taskId: String, title: String) {
+    private suspend fun postFallback(context: Context, reminderId: String, taskId: String, title: String) {
         com.secondbrain.lock.service.ReminderNotifier.show(
             context = context,
             reminderId = reminderId,

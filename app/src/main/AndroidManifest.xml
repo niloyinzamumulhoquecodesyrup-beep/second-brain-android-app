@@ -60,6 +60,12 @@
             android:excludeFromRecents="true"
             android:theme="@style/Theme.ShoreUp" />
 
+        <activity
+            android:name=".ui.nudge.NudgeTakeoverActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.ShoreUp" />
+
         <receiver
             android:name=".service.WakeAlarmReceiver"
             android:exported="false" />
