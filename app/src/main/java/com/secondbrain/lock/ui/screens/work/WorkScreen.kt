@@ -67,6 +67,10 @@ fun WorkScreen(
     // state living inside it) out of composition right after a bankruptcy run — this needs to
     // outlive that for its own 10-second undo window.
     var bankruptcySnapshot by remember { mutableStateOf<Map<String, String?>?>(null) }
+    // NowCard (P16) is a sibling of TasksPanel, not nested inside it, so it owns its own focus
+    // dialog state rather than reaching into TasksPanel's — same pattern AllTasksScreen already
+    // uses for its own FocusPomodoroDialog.
+    var nowCardFocusTask by remember { mutableStateOf<com.secondbrain.lock.network.dto.Task?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -121,6 +125,13 @@ fun WorkScreen(
         ) {
             topBar()
             Spacer(Modifier.height(16.dp))
+            // P16: "what do I do" answered directly, one card, before anything else — including
+            // MorningBriefSection, which is informational rather than an action.
+            NowCard(
+                onOpenFocus = { task -> nowCardFocusTask = task },
+                onOpenRoutineFocus = { item -> nowCardFocusTask = com.secondbrain.lock.network.dto.Task(id = "", title = item.routine.title) }
+            )
+            Spacer(Modifier.height(16.dp))
             MorningBriefSection()
             Spacer(Modifier.height(16.dp))
             // P10: the first screenful is an action (TasksPanel), not a score — RewardPanel's
@@ -169,5 +180,16 @@ fun WorkScreen(
                 onExpire = { bankruptcySnapshot = null }
             )
         }
+    }
+
+    nowCardFocusTask?.let { task ->
+        FocusPomodoroDialog(
+            task = task,
+            onDismiss = { nowCardFocusTask = null },
+            onCompleted = {
+                nowCardFocusTask = null
+                handleCompletion("focus")
+            }
+        )
     }
 }

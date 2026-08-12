@@ -241,6 +241,14 @@ internal val TodayItem.isDoneForToday: Boolean
         is TodayItem.RoutineItem -> block?.status == "done"
     }
 
+/** Scheduled duration, when known — NowCard (P16) needs this alongside [TodayItem.startMin] to
+ * compute a progress fraction; nothing before it needed duration on its own. */
+internal val TodayItem.durationMinutes: Int?
+    get() = when (this) {
+        is TodayItem.TaskItem -> task.durationMin
+        is TodayItem.RoutineItem -> block?.durationMin ?: routine.durationMin
+    }
+
 /** Index, in an already-[buildTodayItems]-sorted list, of the "next up" item — the first
  * not-yet-done item whose window hasn't started yet. Only meaningful when nothing is currently
  * happening: once breakfast ends and nothing else is active until evening, the timeline shouldn't
