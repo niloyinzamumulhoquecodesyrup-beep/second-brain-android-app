@@ -58,6 +58,7 @@ import com.secondbrain.lock.ui.nav.BottomBar
 import com.secondbrain.lock.ui.nav.CommunityState
 import com.secondbrain.lock.ui.nav.Destination
 import com.secondbrain.lock.ui.nav.MINDVERSE_ROOM_ROUTE
+import com.secondbrain.lock.ui.nav.SORT_PASS_ROUTE
 import com.secondbrain.lock.ui.nav.FastCaptureSheet
 import com.secondbrain.lock.ui.nav.TopBar
 import com.secondbrain.lock.ui.nav.VoiceTranscriptBubble
@@ -234,15 +235,19 @@ private fun RootApp(openCaptureTrigger: Int = 0) {
 
     // The Mindverse room is a full-screen call takeover (its own camera-grid/controls bottom
     // chrome) — showing the app's own bottom nav bar underneath it as well would double up on
-    // bottom chrome, so it's hidden for exactly that one route.
+    // bottom chrome, so it's hidden for exactly that one route. Sort Pass (P15) is the same
+    // reasoning: its own Undo/progress-dots header is the only chrome that belongs on screen.
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
-    val inMindverseRoom = currentBackStackEntry?.destination?.route == MINDVERSE_ROOM_ROUTE
+    val hideBottomBar = when (currentBackStackEntry?.destination?.route) {
+        MINDVERSE_ROOM_ROUTE, SORT_PASS_ROUTE -> true
+        else -> false
+    }
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                if (!inMindverseRoom) {
+                if (!hideBottomBar) {
                     BottomBar(navController, onCapture = { voice ->
                         captureStartsListening = voice
                         showFastCapture = true

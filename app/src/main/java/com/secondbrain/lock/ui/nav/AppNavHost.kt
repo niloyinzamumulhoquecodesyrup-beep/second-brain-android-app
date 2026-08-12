@@ -16,6 +16,7 @@ import com.secondbrain.lock.ui.screens.mindverse.MindverseRoomScreen
 import com.secondbrain.lock.ui.screens.mindverse.MindverseScreen
 import com.secondbrain.lock.ui.screens.organize.NoteDetailScreen
 import com.secondbrain.lock.ui.screens.organize.OrganizeScreen
+import com.secondbrain.lock.ui.screens.organize.SortPassScreen
 import com.secondbrain.lock.ui.screens.work.AllTasksScreen
 import com.secondbrain.lock.ui.screens.work.StreakDetailScreen
 import com.secondbrain.lock.ui.screens.work.WorkScreen
@@ -33,6 +34,10 @@ const val ACCOUNT_SETTINGS_ROUTE = "account_settings"
  * currentRoom StateFlow, same as the room picker does. Exported (not private) so MainActivity
  * can compare against it to hide the bottom nav bar while this route is on top. */
 const val MINDVERSE_ROOM_ROUTE = "mindverse_room"
+
+/** Full-screen, bottom-nav-hiding batched inbox-sorting flow (P15) — same reasoning as
+ * [MINDVERSE_ROOM_ROUTE] for why this is exported for MainActivity to compare against. */
+const val SORT_PASS_ROUTE = "sort_pass"
 
 /**
  * The 5 top-level tabs, plus a "note/{noteId}" detail route pushed on top from Organize (and
@@ -73,9 +78,13 @@ fun AppNavHost(
                 onOpenNote = openNote,
                 tagFilter = tag,
                 onClearTag = { backStackEntry.savedStateHandle["tag"] = null },
+                onSortPass = { navController.navigate(SORT_PASS_ROUTE) },
                 contentPadding = contentPadding,
                 topBar = topBar
             )
+        }
+        composable(SORT_PASS_ROUTE) {
+            SortPassScreen(onDone = { navController.popBackStack() }, contentPadding = contentPadding)
         }
         composable(Destination.MIND.route) {
             MindScreen(onOpenNote = openNote, contentPadding = contentPadding, topBar = topBar)
