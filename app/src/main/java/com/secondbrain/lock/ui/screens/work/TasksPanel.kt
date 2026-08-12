@@ -31,11 +31,11 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -70,7 +70,6 @@ import com.secondbrain.lock.network.dto.PlannerDayResponse
 import com.secondbrain.lock.network.dto.PlannerRoutine
 import com.secondbrain.lock.network.dto.Task
 import com.secondbrain.lock.network.dto.UpdatePlannerBlockRequest
-import com.secondbrain.lock.ui.nav.pickTime
 import com.secondbrain.lock.ui.theme.Emerald400
 import com.secondbrain.lock.ui.theme.Gold500
 import com.secondbrain.lock.ui.theme.Ink500
@@ -97,7 +96,6 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import java.util.UUID
 
 private val DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 
@@ -136,27 +134,6 @@ internal fun isDraftTask(task: Task, today: LocalDate): Boolean {
 }
 
 internal data class TaskSubtitleInfo(val text: String, val overdue: Boolean)
-
-/** An AI-suggested subtask (POST /api/tasks/breakdown) shown as a temporary row under its parent
- * task until the user taps "+" to add it for real. [startMin]/[endMin] are computed client-side by
- * stacking each subtask's estimated duration sequentially after the parent task's own end time
- * (or after "now" for an undated/untimed parent). [parentDueDate] is captured at breakdown time so
- * adding the subtask later reuses the exact same due date as its parent. */
-internal data class BreakdownSuggestion(
-    val id: String,
-    val parentTaskId: String,
-    val parentDueDate: String?,
-    val topic: String,
-    val estimatedMinutes: Int,
-    val startMin: Int,
-    val endMin: Int
-) {
-    /** The tasks table's start_min check constraint requires 0..1439 (a single day's minutes) —
-     * stacking subtasks sequentially after a parent that's already late in the day can walk this
-     * past midnight, which the server rejects outright. Suggestions that don't fit are shown but
-     * can't be added, rather than sending an out-of-range value and surfacing a raw DB error. */
-    val fitsToday: Boolean get() = startMin in 0 until 1440
-}
 
 internal fun taskSubtitleInfo(task: Task): TaskSubtitleInfo {
     val dueRaw = task.dueDate
@@ -354,116 +331,10 @@ fun TasksPanel(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // Long-press breakdown state: at most one task's suggestion set is shown at a time, cleared
-    // once every suggestion is added or the user dismisses it.
-    var breakdownTaskId by remember { mutableStateOf<String?>(null) }
-    var breakdownLoading by remember { mutableStateOf(false) }
-    var breakdownError by remember { mutableStateOf<String?>(null) }
-    var breakdownSuggestions by remember { mutableStateOf<List<BreakdownSuggestion>>(emptyList()) }
-    var breakdownRemaining by remember { mutableStateOf<Int?>(null) }
-
-    fun dismissBreakdown() {
-        breakdownTaskId = null
-        breakdownSuggestions = emptyList()
-        breakdownError = null
-    }
-
-    fun requestBreakdown(task: Task) {
-        if (breakdownLoading) return
-        breakdownTaskId = task.id
-        breakdownSuggestions = emptyList()
-        if (breakdownRemaining == 0) {
-            breakdownError = "0 task breakdowns left today"
-            return
-        }
-        breakdownError = null
-        breakdownLoading = true
-        scope.launch {
-            // Subtasks are stacked right after the parent's own scheduled end; an undated/untimed
-            // task has nothing to stack after, so they start from now instead.
-            val base = task.startMin?.let { it + (task.durationMin ?: 0) } ?: currentMinuteOfDay()
-            val result = TasksRepository.breakdown(task.title)
-            breakdownLoading = false
-            result.onSuccess { resp ->
-                var cursor = base
-                breakdownSuggestions = resp.subtasks.map { s ->
-                    val start = cursor
-                    val end = start + s.estimatedMinutes
-                    cursor = end
-                    BreakdownSuggestion(
-                        id = UUID.randomUUID().toString(),
-                        parentTaskId = task.id,
-                        parentDueDate = task.dueDate,
-                        topic = s.topic,
-                        estimatedMinutes = s.estimatedMinutes,
-                        startMin = start,
-                        endMin = end
-                    )
-                }
-                breakdownRemaining = resp.remainingToday
-            }.onFailure {
-                breakdownError = it.message ?: "Breakdown failed"
-            }
-        }
-    }
-
-    // Adds one suggestion as a real task at its computed slot, then pushes every other still-open
-    // task scheduled today at or after that slot back by the same duration — the rest of the day
-    // shifts to make room, mirroring what the spec calls "the rest of the task time will be
-    // adjusted." Suggestions not added are left alone; only committing one actually reserves time.
-    fun addBreakdownSuggestion(suggestion: BreakdownSuggestion) {
-        if (!suggestion.fitsToday) {
-            Toast.makeText(context, "That falls after midnight — no room left today", Toast.LENGTH_LONG).show()
-            return
-        }
-        scope.launch {
-            TasksRepository.create(title = suggestion.topic, dueDate = suggestion.parentDueDate).onSuccess { created ->
-                TasksRepository.reschedule(created.id, suggestion.startMin, suggestion.estimatedMinutes)
-                TasksRepository.tasks.value
-                    .filter { it.id != created.id && !it.done && isTodayTask(it, LocalDate.now()) && (it.startMin ?: -1) >= suggestion.startMin }
-                    .forEach { t ->
-                        val shiftedStart = (t.startMin ?: 0) + suggestion.estimatedMinutes
-                        // Same start_min < 1440 constraint as the suggestion itself — a task that
-                        // would get pushed past midnight is left where it is rather than shifted
-                        // into an invalid slot (better a stale time than a failed request).
-                        if (shiftedStart < 1440) {
-                            TasksRepository.reschedule(t.id, shiftedStart, t.durationMin ?: 0)
-                        }
-                    }
-                breakdownSuggestions = breakdownSuggestions.filterNot { it.id == suggestion.id }
-                if (breakdownSuggestions.isEmpty()) breakdownTaskId = null
-            }.onFailure {
-                // Surfaced immediately here (rather than left to TasksRepository's top-of-card
-                // error banner) so a failed "+" tap is obviously tied to the suggestion the user
-                // just tapped, not a generic message disconnected from what caused it.
-                Toast.makeText(context, it.message ?: "Couldn't add subtask", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    // A suggestion that doesn't fit today gets scheduled onto a day/time the user picks instead —
-    // same calendar/clock dialogs as the nav bar's "+" quick-add, with today blocked in the
-    // calendar since that's exactly the day this suggestion didn't fit into.
-    fun addBreakdownSuggestionOnDate(suggestion: BreakdownSuggestion, date: LocalDate, time: LocalTime) {
-        scope.launch {
-            TasksRepository.create(title = suggestion.topic, dueDate = date.toString()).onSuccess { created ->
-                TasksRepository.reschedule(created.id, time.hour * 60 + time.minute, suggestion.estimatedMinutes)
-                breakdownSuggestions = breakdownSuggestions.filterNot { it.id == suggestion.id }
-                if (breakdownSuggestions.isEmpty()) breakdownTaskId = null
-            }.onFailure {
-                Toast.makeText(context, it.message ?: "Couldn't add subtask", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    fun scheduleSuggestionForLater(suggestion: BreakdownSuggestion) {
-        val tomorrow = LocalDate.now().plusDays(1)
-        pickDate(context, initial = tomorrow, minDate = tomorrow) { date ->
-            pickTime(context, initial = LocalTime.of(9, 0)) { time ->
-                addBreakdownSuggestionOnDate(suggestion, date, time)
-            }
-        }
-    }
+    // Owns the whole "break this task down" flow (request/loading/error/suggestions/add/discard/
+    // recurse) — see TaskBreakdownController's KDoc for why this is a shared controller rather
+    // than per-screen state. At most one task's breakdown is open at a time.
+    val breakdownController = rememberTaskBreakdownController()
 
     // Ticks the "current" accent dot forward as real time passes — without this, a task/routine
     // entering or leaving its scheduled window would only repaint whenever something unrelated
@@ -552,7 +423,9 @@ fun TasksPanel(
             SeeAllButton(onClick = onSeeAll)
         }
         Spacer(Modifier.height(4.dp))
-        Text("Long tap for task break down", color = Mist400, style = SecondBrainTypography.bodySmall)
+        // P13: long-press alone wasn't discoverable, so the ⋮ menu on every row is now the primary
+        // affordance — this hint just tells people the shortcut still exists.
+        Text("Tap ⋮ (or long-press) to break a task down", color = Mist400, style = SecondBrainTypography.bodySmall)
         Spacer(Modifier.height(14.dp))
 
         if (error != null) {
@@ -572,7 +445,7 @@ fun TasksPanel(
                 when (item) {
                     is TodayItem.TaskItem -> {
                         val info = taskSubtitleInfo(item.task)
-                        val isBreakingDown = breakdownLoading && breakdownTaskId == item.task.id
+                        val isBreakingDown = breakdownController.loading && breakdownController.taskId == item.task.id
                         TimelineRow(
                             icon = RowIcon.TASK,
                             title = item.task.title,
@@ -590,17 +463,13 @@ fun TasksPanel(
                             onToggle = { scope.launch { TasksRepository.setDone(item.task.id, true).onSuccess { onCompletion("task") } } },
                             onFocus = { openFocus(item.task) },
                             onDelete = null,
-                            onLongPress = { requestBreakdown(item.task) }
+                            onLongPress = { breakdownController.request(item.task) },
+                            // Same handler as long-press (P13) — the ⋮ menu is the discoverable
+                            // entry point, long-press stays as the power-user shortcut.
+                            onBreakdownClick = { breakdownController.request(item.task) }
                         )
-                        if (breakdownTaskId == item.task.id) {
-                            BreakdownSuggestionsBlock(
-                                loading = breakdownLoading,
-                                error = breakdownError,
-                                suggestions = breakdownSuggestions,
-                                onAdd = ::addBreakdownSuggestion,
-                                onScheduleLater = ::scheduleSuggestionForLater,
-                                onDismiss = ::dismissBreakdown
-                            )
+                        if (breakdownController.taskId == item.task.id) {
+                            TaskBreakdownBlock(breakdownController)
                         }
                     }
                     is TodayItem.RoutineItem -> TimelineRow(
@@ -619,6 +488,9 @@ fun TasksPanel(
                         onFocus = { openRoutineFocus(item) },
                         onDelete = null,
                         onLongPress = { Toast.makeText(context, "Task breakdown isn't available for routines", Toast.LENGTH_SHORT).show() }
+                        // No onBreakdownClick: unlike long-press (a long-standing, low-visibility
+                        // shortcut), a menu item that always shows "not available" is dead UI —
+                        // don't render the ⋮ affordance at all for routines.
                     )
                 }
             }
@@ -677,6 +549,9 @@ internal fun TimelineRow(
     onFocus: (() -> Unit)?,
     onDelete: (() -> Unit)?,
     onLongPress: (() -> Unit)? = null,
+    // P13: a ⋮ "Break it down" menu item, shown only when non-null — long-press (above) reaches
+    // the identical flow but is undiscoverable; this is the menu equivalent, not a second flow.
+    onBreakdownClick: (() -> Unit)? = null,
     dimmed: Boolean = false
 ) {
     val requester = remember { BringIntoViewRequester() }
@@ -768,6 +643,20 @@ internal fun TimelineRow(
                     Icon(Icons.Filled.PlayArrow, contentDescription = "Start focus", tint = Violet400)
                 }
             }
+            if (onBreakdownClick != null) {
+                var menuExpanded by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "More actions", tint = Mist400)
+                    }
+                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Break it down") },
+                            onClick = { menuExpanded = false; onBreakdownClick() }
+                        )
+                    }
+                }
+            }
             if (onToggle != null) {
                 ToggleCircle(done = done, onClick = onToggle)
             }
@@ -792,95 +681,6 @@ private fun ToggleCircle(done: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         if (done) Text("✓", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-/** The temporary rows shown under a task right after a long-press breakdown: a loading line while
- * the request is in flight, the server's error message verbatim on failure (matches the API's
- * "show this verbatim" guidance for the 429 daily-limit case), or one row per suggestion with its
- * computed time window and a "+" to add it for real. */
-@Composable
-private fun BreakdownSuggestionsBlock(
-    loading: Boolean,
-    error: String?,
-    suggestions: List<BreakdownSuggestion>,
-    onAdd: (BreakdownSuggestion) -> Unit,
-    onScheduleLater: (BreakdownSuggestion) -> Unit,
-    onDismiss: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 26.dp, bottom = 8.dp)
-    ) {
-        when {
-            loading -> BreakdownLoadingDots(modifier = Modifier.padding(vertical = 4.dp))
-            error != null -> Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(error, color = Rose400, style = SecondBrainTypography.bodySmall, modifier = Modifier.weight(1f))
-                Text(
-                    "✕",
-                    color = Mist400,
-                    style = SecondBrainTypography.bodySmall,
-                    modifier = Modifier.clickable(onClick = onDismiss).padding(start = 8.dp)
-                )
-            }
-            suggestions.isNotEmpty() -> {
-                suggestions.forEach { suggestion ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 6.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(BorderStroke(1.dp, Ink600), RoundedCornerShape(12.dp))
-                            .padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(suggestion.topic, color = Mist100, style = SecondBrainTypography.bodySmall)
-                            Text(
-                                if (suggestion.fitsToday) {
-                                    "${formatMinuteOfDay(suggestion.startMin)} – ${formatMinuteOfDay(suggestion.endMin)} · " +
-                                        formatFocusMinutes(suggestion.estimatedMinutes)
-                                } else {
-                                    "No room left today — pick another day · ${formatFocusMinutes(suggestion.estimatedMinutes)}"
-                                },
-                                color = Mist400,
-                                style = SecondBrainTypography.bodySmall
-                            )
-                        }
-                        if (suggestion.fitsToday) {
-                            IconButton(onClick = { onAdd(suggestion) }) {
-                                Icon(Icons.Filled.Add, contentDescription = "Add subtask", tint = StreakAccent)
-                            }
-                        } else {
-                            IconButton(onClick = { onScheduleLater(suggestion) }) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Filled.CalendarToday,
-                                        contentDescription = "Pick a day",
-                                        tint = StreakAccent,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(Modifier.width(2.dp))
-                                    Icon(
-                                        Icons.Filled.AccessTime,
-                                        contentDescription = "Pick a time",
-                                        tint = StreakAccent,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-                Text(
-                    "Discard suggestions",
-                    color = Mist400,
-                    style = SecondBrainTypography.bodySmall,
-                    modifier = Modifier.clickable(onClick = onDismiss)
-                )
-            }
-        }
     }
 }
 

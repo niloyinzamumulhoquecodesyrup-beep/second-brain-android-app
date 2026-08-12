@@ -85,6 +85,11 @@ fun AllTasksScreen(
     var tab by remember { mutableStateOf(TasksTab.TODAY) }
     var nowMinute by remember { mutableStateOf(currentMinuteOfDay()) }
     val scope = rememberCoroutineScope()
+    // P13: same breakdown flow as the compact TasksPanel card, surfaced here too via the ⋮ menu
+    // on the Today tab's rows. Only Today's rows get it — the stacking logic below assumes
+    // subtasks are scheduled against TODAY's timeline, which doesn't make sense for a task due
+    // next week (Week/Month tabs) or one already finished (Done).
+    val breakdownController = rememberTaskBreakdownController()
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -173,7 +178,8 @@ fun AllTasksScreen(
                             onFocusTask = { focusTask = it },
                             onDeleteTask = ::deleteTask,
                             onToggleRoutine = ::toggleRoutineDone,
-                            onFocusRoutine = ::openRoutineFocus
+                            onFocusRoutine = ::openRoutineFocus,
+                            breakdownController = breakdownController
                         )
                     }
                     TasksTab.WEEK -> TaskTimelineList(weekTasks, nowMinute = nowMinute, onToggle = { toggleDone(it, true) }, onFocus = { focusTask = it }, onDelete = ::deleteTask)
@@ -284,7 +290,8 @@ private fun TodayTimelineList(
     onFocusTask: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
     onToggleRoutine: (TodayItem.RoutineItem, Boolean) -> Unit,
-    onFocusRoutine: (TodayItem.RoutineItem) -> Unit
+    onFocusRoutine: (TodayItem.RoutineItem) -> Unit,
+    breakdownController: TaskBreakdownController
 ) {
     if (items.isEmpty()) {
         Text("Nothing here.", color = Mist400, style = SecondBrainTypography.bodySmall)
@@ -298,11 +305,12 @@ private fun TodayTimelineList(
         when (item) {
             is TodayItem.TaskItem -> {
                 val info = taskSubtitleInfo(item.task)
+                val isBreakingDown = breakdownController.loading && breakdownController.taskId == item.task.id
                 TimelineRow(
                     icon = RowIcon.TASK,
                     title = item.task.title,
-                    subtitle = if (item.task.pendingSync) "Syncing… · ${info.text}" else info.text,
-                    subtitleColor = if (info.overdue) Mist500 else Mist300,
+                    subtitle = if (isBreakingDown) "Breaking down…" else if (item.task.pendingSync) "Syncing… · ${info.text}" else info.text,
+                    subtitleColor = if (isBreakingDown) Mist400 else if (info.overdue) Mist500 else Mist300,
                     bg = rowBg(index),
                     dotColor = dotColor,
                     showLineAbove = !isFirst,
@@ -310,10 +318,16 @@ private fun TodayTimelineList(
                     done = false,
                     highlighted = false,
                     truncateTitle = false,
+                    dimmed = isBreakingDown,
                     onToggle = { onToggleTask(item.task) },
                     onFocus = { onFocusTask(item.task) },
-                    onDelete = { onDeleteTask(item.task) }
+                    onDelete = { onDeleteTask(item.task) },
+                    onLongPress = { breakdownController.request(item.task) },
+                    onBreakdownClick = { breakdownController.request(item.task) }
                 )
+                if (breakdownController.taskId == item.task.id) {
+                    TaskBreakdownBlock(breakdownController)
+                }
             }
             is TodayItem.RoutineItem -> TimelineRow(
                 icon = RowIcon.ROUTINE,
