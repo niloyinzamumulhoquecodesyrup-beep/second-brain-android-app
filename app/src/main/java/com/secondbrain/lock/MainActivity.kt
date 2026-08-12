@@ -222,6 +222,7 @@ private fun RootApp(openCaptureTrigger: Int = 0) {
     }
 
     var showFastCapture by remember { mutableStateOf(false) }
+    var captureStartsListening by remember { mutableStateOf(false) }
     var showFullCapture by remember { mutableStateOf(false) }
     // P7: the launcher shortcut and widget capture button both deep-link here. Not reachable
     // while logged out (this whole block is past the auth early-return above) — an edge case
@@ -242,10 +243,10 @@ private fun RootApp(openCaptureTrigger: Int = 0) {
             containerColor = Color.Transparent,
             bottomBar = {
                 if (!inMindverseRoom) {
-                    // `voice` is unused until P12 wires real listening into FastCaptureSheet —
-                    // both tap and long-press just open the sheet for now, per P6a's own explicit
-                    // fallback for exactly this ordering.
-                    BottomBar(navController, onCapture = { _ -> showFastCapture = true })
+                    BottomBar(navController, onCapture = { voice ->
+                        captureStartsListening = voice
+                        showFastCapture = true
+                    })
                 }
             }
         ) { padding ->
@@ -272,7 +273,8 @@ private fun RootApp(openCaptureTrigger: Int = 0) {
                 // the whole point; only the explicit dismiss above or the full-capture handoff
                 // below should ever close it.
                 onCaptured = {},
-                onOpenFullCapture = { showFastCapture = false; showFullCapture = true }
+                onOpenFullCapture = { showFastCapture = false; showFullCapture = true },
+                startListening = captureStartsListening
             )
         }
         if (showFullCapture) {
