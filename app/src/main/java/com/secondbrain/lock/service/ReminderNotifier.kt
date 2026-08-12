@@ -63,7 +63,12 @@ object ReminderNotifier {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val builder = NotificationCompat.Builder(context, LockApp.TASK_CHANNEL_ID)
+        // PERSIST_CHANNEL_ID is IMPORTANCE_HIGH same as TASK_CHANNEL_ID, but user-visibly labeled
+        // "Persistent reminders" — LockApp declared it specifically for this level>=2 tier (see its
+        // KDoc there), so an ongoing/colorized notification shouldn't quietly ride the plain
+        // "Task reminders" channel a user might have muted or customized differently.
+        val channelId = if (level >= 2) LockApp.PERSIST_CHANNEL_ID else LockApp.TASK_CHANNEL_ID
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(title)
             .setContentText(body)
