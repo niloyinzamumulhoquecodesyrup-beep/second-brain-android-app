@@ -8,6 +8,7 @@ import com.secondbrain.lock.data.FocusState
 import com.secondbrain.lock.data.RoutineCache
 import com.secondbrain.lock.data.SecurePrefs
 import com.secondbrain.lock.network.dto.BriefingRequest
+import com.secondbrain.lock.network.dto.DeviceTokenRequest
 import com.secondbrain.lock.network.dto.BriefingResponse
 import com.secondbrain.lock.network.dto.CommunityBookResponse
 import com.secondbrain.lock.network.dto.CommunityBooksResponse
@@ -467,4 +468,24 @@ object ApiClient {
         executeRaw(request)
         Unit
     }
+
+    /** DELETE [body] (any @Serializable type) to [path]. Response body (if any) is ignored — same
+     * shape as [postTyped]/[putTyped]/[patchTyped], for the rare DELETE that needs a request body
+     * (P23's `DELETE /api/devices/register {token}`, unlike every other DELETE in this app so far). */
+    suspend inline fun <reified B> deleteTyped(path: String, body: B): Result<Unit> = runCatching {
+        val request = Request.Builder()
+            .url("$baseUrl$path")
+            .delete(json.encodeToString(body).toRequestBody(jsonMediaType))
+            .build()
+        executeRaw(request)
+        Unit
+    }
+
+    // ---- P5: FCM device token registration ----
+
+    suspend fun registerDeviceToken(token: String): Result<Unit> =
+        postTyped<DeviceTokenRequest, OkResponse>("/api/devices/register", DeviceTokenRequest(token)).map {}
+
+    suspend fun unregisterDeviceToken(token: String): Result<Unit> =
+        deleteTyped("/api/devices/register", DeviceTokenRequest(token))
 }

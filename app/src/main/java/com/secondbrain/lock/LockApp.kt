@@ -23,9 +23,13 @@ import com.secondbrain.lock.data.repo.TasksRepository
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.service.Overlays
 import com.secondbrain.lock.service.ReminderScheduler
+import com.secondbrain.lock.service.SbMessagingService
 import com.secondbrain.lock.ui.theme.SbThemeState
 import com.secondbrain.lock.ui.theme.ThemeMode
 import com.secondbrain.lock.widget.SectographUpdateWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 class LockApp : Application() {
@@ -58,6 +62,14 @@ class LockApp : Application() {
         // NetworkType.CONNECTED constraint — replays anything SyncQueue queued last session while
         // offline (task creates/edits, focus-activity logs) that never made it to the server.
         SyncQueue.scheduleFlush()
+        // P5 FCM backstop: re-confirm the current token is registered once per cold start. Covers
+        // the case where the process was already logged in when it started (a login's own success
+        // path in MainActivity handles the case where it wasn't). fetchAndRegisterCurrentToken
+        // no-ops the network call entirely when the token hasn't actually changed since the last
+        // successful send, so this is cheap even though it runs on every launch.
+        if (SecurePrefs.getToken(this) != null) {
+            CoroutineScope(Dispatchers.IO).launch { SbMessagingService.fetchAndRegisterCurrentToken(this@LockApp) }
+        }
         // Reuses ApiClient's OkHttp client (bearer-token interceptor included) so any AsyncImage
         // pointed at an authenticated endpoint like /api/auth/avatar just works.
         Coil.setImageLoader(ImageLoader.Builder(this).okHttpClient(ApiClient.client).build())

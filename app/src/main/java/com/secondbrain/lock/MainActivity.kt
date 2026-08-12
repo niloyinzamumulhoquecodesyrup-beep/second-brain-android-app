@@ -48,6 +48,7 @@ import com.secondbrain.lock.data.SyncQueue
 import com.secondbrain.lock.data.repo.ProfileRepository
 import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.service.MonitorService
+import com.secondbrain.lock.service.SbMessagingService
 import com.secondbrain.lock.ui.nav.ACCOUNT_SETTINGS_ROUTE
 import com.secondbrain.lock.ui.nav.AppNavHost
 import com.secondbrain.lock.ui.nav.BottomBar
@@ -117,7 +118,12 @@ private fun RootApp() {
                             // bearer token the native app actually stores.
                             .mapCatching { ApiClient.login(email, password).getOrThrow() }
                         authLoading = false
-                        result.onSuccess { token -> authToken = token }
+                        result.onSuccess { token ->
+                            authToken = token
+                            // P5: same-process login (unlike LockApp's cold-start check) — nothing
+                            // else will pick this account's FCM token up otherwise.
+                            scope.launch { SbMessagingService.fetchAndRegisterCurrentToken(context) }
+                        }
                         result.onFailure { error -> authError = error.message ?: "Registration failed" }
                     }
                 },
@@ -133,7 +139,10 @@ private fun RootApp() {
                     scope.launch {
                         val result = ApiClient.login(email, password)
                         authLoading = false
-                        result.onSuccess { token -> authToken = token }
+                        result.onSuccess { token ->
+                            authToken = token
+                            scope.launch { SbMessagingService.fetchAndRegisterCurrentToken(context) }
+                        }
                         result.onFailure { error -> authError = error.message ?: "Login failed" }
                     }
                 },
@@ -147,15 +156,18 @@ private fun RootApp() {
     // Shared by the normal logout menu item and a successful account deactivation — both end
     // the session locally the same way.
     val onLogout: () -> Unit = {
-        ApiClient.logout()
         ProfileRepository.clear()
         // A different account may log in next on this device — don't let its first
         // launch flash the previous account's cached data before its own refresh lands.
         scope.launch {
-            // Best-effort: sync whatever we still can before the cache — and the pending-ops
-            // queue riding inside it — gets wiped below. A 401 doesn't take this path (the
-            // interceptor just nulls the token); this is explicit logout only.
+            // Best-effort, and — this matters — BOTH need to run before ApiClient.logout() below
+            // clears the bearer token, since they're authenticated calls (an unauthenticated
+            // SyncQueue.flush() would just 401 on every op instead of actually syncing them, and
+            // unregisterCurrentToken needs the same auth to reach the DELETE at all). A 401 doesn't
+            // take this path (the interceptor just nulls the token); this is explicit logout only.
             runCatching { SyncQueue.flush() }
+            runCatching { SbMessagingService.unregisterCurrentToken(context) }
+            ApiClient.logout()
             val orphaned = LocalCache.load<List<PendingOp>>("pending_ops").orEmpty()
             LocalCache.clearAll()
             if (orphaned.isNotEmpty()) {
