@@ -11,10 +11,16 @@ import com.secondbrain.lock.network.dto.TaskBreakdownRequest
 import com.secondbrain.lock.network.dto.TaskBreakdownResponse
 import com.secondbrain.lock.network.dto.TaskPiece
 import com.secondbrain.lock.network.dto.UpdateTaskRequest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.serialization.decodeFromString
+import org.json.JSONObject
 import java.util.UUID
 
 private const val LOCAL_ID_PREFIX = "local-"
@@ -25,6 +31,13 @@ object TasksRepository {
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    /** Genuinely fire-and-forget background work that must outlive the suspend function that
+     * launches it — [bankruptcy]/[undoBankruptcy]'s per-task PUTs specifically. A plain
+     * `coroutineScope { launch { ... } }` inside those functions would AWAIT every child before
+     * the function returns, which quietly defeats the entire point (the caller must never wait on
+     * N network round-trips). SupervisorJob so one task's failure can't cancel the others. */
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     suspend fun restore() {
         LocalCache.load<List<Task>>("tasks")?.let { _tasks.value = it }
@@ -116,11 +129,99 @@ object TasksRepository {
         return result
     }
 
-    /** Moves a task's due date to another day — mirrors TasksPanel.js's scheduleTask(). */
+    /** Moves a task's due date to another day, or clears it entirely (making it a draft) when
+     * [dueDate] is null — mirrors TasksPanel.js's scheduleTask().
+     *
+     * The null case can't go through [updateTask]/[ApiClient.putTyped]: [ApiClient.json]'s
+     * `explicitNulls = false` means `UpdateTaskRequest(dueDate = null)` — a nullable property
+     * whose default IS null — always encodes with the `due_date` key omitted entirely, never as
+     * `"due_date": null`. A PATCH-style endpoint reads a missing key as "leave this field alone,"
+     * so the typed path can never actually clear a due date over the network; it only ever
+     * LOOKED like it worked, via the optimistic local state, until a later refresh (or the
+     * mutation's own success handler swapping in the server's unchanged response) silently
+     * reverted it. Confirmed by direct reproduction: a task's "waiting since ..." date survived
+     * repeated real "Clear the whole list" (P9) network round-trips.
+     *
+     * Routes the null case through [ApiClient.putJson] with an explicit `org.json.JSONObject.NULL`
+     * instead. Pre-existing bug, not introduced by P9 — [SyncQueue.flush]'s TYPE_UPDATE_TASK
+     * replay path still uses the typed encoder for a QUEUED clear-due-date op, so a due-date clear
+     * that gets queued while offline (rather than applied immediately here) will hit the exact
+     * same gap on replay. Fixing that is a wider change than this call site; left as a known
+     * follow-up rather than attempted here. */
     suspend fun setDueDate(id: String, dueDate: String?): Result<Task> {
-        val result = updateTask(id, UpdateTaskRequest(dueDate = dueDate), failureMessage = "Couldn't reschedule task") { it.copy(dueDate = dueDate) }
+        val result = if (dueDate == null) clearDueDate(id) else updateTask(
+            id, UpdateTaskRequest(dueDate = dueDate), failureMessage = "Couldn't reschedule task"
+        ) { it.copy(dueDate = dueDate) }
         if (result.isSuccess) ReminderScheduler.rescheduleAll()
         return result
+    }
+
+    /** The null-clearing half of [setDueDate] — same network-first / offline-optimistic-queue
+     * shape as [updateTask], just built on [ApiClient.putJson] instead of [ApiClient.putTyped] so
+     * the explicit null actually reaches the server. See [setDueDate]'s KDoc for why. */
+    private suspend fun clearDueDate(id: String): Result<Task> {
+        val update = UpdateTaskRequest(dueDate = null)
+        val result = ApiClient.putJson("/api/tasks/$id", JSONObject().put("due_date", JSONObject.NULL))
+            .mapCatching { obj -> ApiClient.json.decodeFromString<Task>(obj.toString()) }
+        result.onSuccess { updated -> _tasks.update { list -> list.map { if (it.id == id) updated else it } }; _error.value = null }
+        if (result.isFailure) {
+            if (ApiClient.isOffline()) {
+                val current = _tasks.value.find { it.id == id } ?: return result
+                val optimistic = current.copy(dueDate = null, pendingSync = true)
+                _tasks.update { list -> list.map { if (it.id == id) optimistic else it } }
+                LocalCache.save("tasks", _tasks.value)
+                SyncQueue.enqueue(
+                    PendingOp(id = SyncQueue.newOpId(), type = PendingOp.TYPE_UPDATE_TASK, createdAt = System.currentTimeMillis(), taskId = id, update = update)
+                )
+                return Result.success(optimistic)
+            }
+            _error.value = result.exceptionOrNull()?.message ?: "Couldn't reschedule task"
+        }
+        return result
+    }
+
+    /** WelcomeBackSheet's "Clear the whole list" (P9) — sets every open task's due date to null
+     * (making it a draft, per [com.secondbrain.lock.ui.screens.work.isDraftTask]) with no
+     * confirmation dialog; a 10-second undo in the sheet itself is the entire safety net.
+     *
+     * [refresh]es first, awaited, before computing which tasks to clear — confirmed by direct
+     * reproduction that skipping this drops tasks silently: on a cold start, this and
+     * [com.secondbrain.lock.ui.screens.work.WorkScreen]'s own `TasksRepository.refresh()` call
+     * both fire around the same time, and [_tasks] can still be [restore]'s (older) cached
+     * snapshot at the exact moment bankruptcy reads it, missing anything created or changed since
+     * that cache was last written. This does NOT reintroduce the "user must never wait" problem
+     * this function otherwise avoids — nothing upstream ever awaits [bankruptcy]'s return before
+     * dismissing the sheet, so this extra round-trip just makes the BACKGROUND work more correct,
+     * invisibly, without blocking anything the user sees.
+     *
+     * Once current, applies to local state SYNCHRONOUSLY (the line right after) and returns a
+     * snapshot the caller can hand back to [undoBankruptcy] — the actual per-task PUTs fire
+     * afterward and are never awaited by anything upstream. Deliberately reuses [setDueDate]
+     * (network-first, offline-queued on a connectivity failure) for each task rather than a
+     * bespoke unconditional-enqueue shortcut, so a genuine per-task failure still surfaces
+     * normally instead of masquerading as connectivity trouble. */
+    suspend fun bankruptcy(): Map<String, String?> {
+        runCatching { refresh() }
+        val openTasks = _tasks.value.filter { !it.done }
+        val snapshot = openTasks.associate { it.id to it.dueDate }
+        _tasks.update { list -> list.map { if (!it.done) it.copy(dueDate = null, pendingSync = true) else it } }
+        LocalCache.save("tasks", _tasks.value)
+        openTasks.forEach { task -> backgroundScope.launch { setDueDate(task.id, null) } }
+        return snapshot
+    }
+
+    /** Reverses [bankruptcy] within its 10-second undo window — [snapshot] maps task id to its
+     * ORIGINAL due date (which may itself be null, for a task that was already a draft), so this
+     * uses [Map.containsKey] rather than a null-coalescing read to tell "restore this task's
+     * original null" apart from "this task wasn't part of the snapshot, leave it alone." */
+    suspend fun undoBankruptcy(snapshot: Map<String, String?>) {
+        _tasks.update { list ->
+            list.map { task ->
+                if (snapshot.containsKey(task.id)) task.copy(dueDate = snapshot.getValue(task.id), pendingSync = true) else task
+            }
+        }
+        LocalCache.save("tasks", _tasks.value)
+        snapshot.forEach { (id, dueDate) -> backgroundScope.launch { setDueDate(id, dueDate) } }
     }
 
     /** "Break it into pieces" — persists the focus session's sub-step checklist onto the task.

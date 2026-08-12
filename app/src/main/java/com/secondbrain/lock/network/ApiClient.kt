@@ -390,6 +390,31 @@ object ApiClient {
         }
     }
 
+    /** PUT a raw org.json [body] rather than a `@Serializable`-encoded type via [putTyped] — needed
+     * whenever a request must send an EXPLICIT `null` for a field. [json]'s `explicitNulls = false`
+     * (deliberate for the typed helpers below: a caller constructing a request DTO with an unset
+     * nullable field shouldn't accidentally clear it server-side) means a nullable property with a
+     * null default, like [com.secondbrain.lock.network.dto.UpdateTaskRequest.dueDate], can NEVER
+     * be encoded as `null` through [putTyped] — the field is simply omitted, which a PATCH-style
+     * endpoint reads as "don't touch this," not "clear it." Build the body with `org.json.JSONObject.NULL`
+     * for any field that genuinely needs to be cleared. */
+    suspend fun putJson(path: String, body: JSONObject): Result<JSONObject> = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder()
+                .url("$baseUrl$path")
+                .put(body.toString().toRequestBody(jsonMediaType))
+                .build()
+            client.newCall(request).execute().use { response ->
+                val bodyString = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    logFailure(request, response.code, bodyString)
+                    throw IOException(errorMessage(response.code, bodyString))
+                }
+                if (bodyString.isBlank()) JSONObject() else JSONObject(bodyString)
+            }
+        }
+    }
+
     @PublishedApi internal fun errorMessage(code: Int, body: String): String {
         val detail = runCatching { JSONObject(body).optString("error") }.getOrNull()
         return if (!detail.isNullOrBlank()) detail else "Request failed ($code)"

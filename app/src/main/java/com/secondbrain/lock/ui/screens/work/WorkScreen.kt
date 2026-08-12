@@ -15,16 +15,20 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.secondbrain.lock.data.WelcomeBackPrefs
 import com.secondbrain.lock.data.repo.MindQueueRepository
 import com.secondbrain.lock.data.repo.PlannerRepository
 import com.secondbrain.lock.data.repo.StatsRepository
 import com.secondbrain.lock.data.repo.TasksRepository
 import com.secondbrain.lock.ui.theme.fullAuraBackground
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 private data class Celebration(val message: String, val bonus: Boolean)
 
@@ -55,6 +59,16 @@ fun WorkScreen(
     // A NudgesStrip task reminder's "Open" sets this; TasksPanel scrolls/glows the matching row
     // then clears it itself once the glow finishes (mirrors pages/work.js's highlightKey).
     var highlightTaskId by remember { mutableStateOf<String?>(null) }
+    // P9: null means "no lapse to show" — set once, at most, the first time WorkScreen enters
+    // composition in this process lifetime (a practical proxy for "on app foreground" without
+    // threading a real ON_RESUME observer down from MainActivity for one-time use).
+    var welcomeBackDays by remember { mutableStateOf<Int?>(null) }
+    // Owned here, not inside WelcomeBackSheet, because onDismiss tears that composable (and any
+    // state living inside it) out of composition right after a bankruptcy run — this needs to
+    // outlive that for its own 10-second undo window.
+    var bankruptcySnapshot by remember { mutableStateOf<Map<String, String?>?>(null) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         launch { StatsRepository.refresh() }
@@ -62,6 +76,17 @@ fun WorkScreen(
         launch { PlannerRepository.refreshRoutines() }
         launch { PlannerRepository.refreshToday() }
         launch { MindQueueRepository.refresh() }
+        launch {
+            val today = LocalDate.now().toEpochDay()
+            val lastOpened = WelcomeBackPrefs.getLastOpenedEpochDay(context)
+            // A null lastOpened means this is the very first time the app's ever been opened —
+            // that's onboarding's job, not a lapse to welcome the user back from.
+            if (lastOpened != null) {
+                val gap = (today - lastOpened).toInt()
+                if (gap >= 3) welcomeBackDays = gap
+            }
+            WelcomeBackPrefs.setLastOpenedEpochDay(context, today)
+        }
     }
 
     // Mirrors pages/work.js's handleCompletion: the stats bump always happens, unconditionally —
@@ -117,6 +142,29 @@ fun WorkScreen(
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CompletionCelebration(message = c.message, bonus = c.bonus, onDone = { celebration = null })
             }
+        }
+
+        welcomeBackDays?.let { days ->
+            WelcomeBackSheet(
+                daysSinceLastOpen = days,
+                onShowOneThing = { taskId ->
+                    highlightTaskId = taskId
+                    welcomeBackDays = null
+                },
+                onBankruptcy = { scope.launch { bankruptcySnapshot = TasksRepository.bankruptcy() } },
+                onDismiss = { welcomeBackDays = null }
+            )
+        }
+
+        bankruptcySnapshot?.let { snapshot ->
+            BankruptcyUndoBar(
+                bottomPadding = contentPadding.calculateBottomPadding(),
+                onUndo = {
+                    scope.launch { TasksRepository.undoBankruptcy(snapshot) }
+                    bankruptcySnapshot = null
+                },
+                onExpire = { bankruptcySnapshot = null }
+            )
         }
     }
 }
