@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +20,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.secondbrain.lock.data.WelcomeBackPrefs
@@ -26,6 +28,7 @@ import com.secondbrain.lock.data.repo.MindQueueRepository
 import com.secondbrain.lock.data.repo.PlannerRepository
 import com.secondbrain.lock.data.repo.StatsRepository
 import com.secondbrain.lock.data.repo.TasksRepository
+import com.secondbrain.lock.ui.theme.TimeBar
 import com.secondbrain.lock.ui.theme.fullAuraBackground
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -124,6 +127,12 @@ fun WorkScreen(
                 )
         ) {
             topBar()
+            // P17: full-bleed, so it breaks out of this Column's own 16dp horizontal padding.
+            // Modifier.padding rejects negative values (IllegalArgumentException), so this widens
+            // the measurement and shifts placement left instead, rather than trying to pad by -16dp.
+            Box(Modifier.fillMaxWidth().fullBleed(16.dp)) {
+                TimeBar()
+            }
             Spacer(Modifier.height(16.dp))
             // P16: "what do I do" answered directly, one card, before anything else — including
             // MorningBriefSection, which is informational rather than an action.
@@ -191,5 +200,16 @@ fun WorkScreen(
                 handleCompletion("focus")
             }
         )
+    }
+}
+
+/** Breaks a child out of its parent's horizontal padding by [inset] on each side — measures with
+ * a wider constraint and shifts placement left, rather than a negative [Modifier.padding], which
+ * throws (`IllegalArgumentException: Padding must be non-negative`) in this Compose version. */
+private fun Modifier.fullBleed(inset: androidx.compose.ui.unit.Dp): Modifier = this.layout { measurable, constraints ->
+    val insetPx = inset.roundToPx()
+    val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + insetPx * 2))
+    layout(placeable.width - insetPx * 2, placeable.height) {
+        placeable.placeRelative(-insetPx, 0)
     }
 }

@@ -7,6 +7,7 @@ object SleepPrefs {
     private const val FILE_NAME = "sleep_prefs"
     private const val KEY_ENABLED = "enabled"
     private const val KEY_WAKE_MINUTE_OF_DAY = "wake_minute_of_day"
+    private const val KEY_SLEEP_MINUTE_OF_DAY = "sleep_minute_of_day"
     private const val KEY_USE_ROUTINE = "use_routine_sleep_window"
     private const val KEY_LAST_SNOOZE_EPOCH_DAY = "last_snooze_epoch_day"
     private const val KEY_LAST_SKIP_EPOCH_DAY = "last_skip_epoch_day"
@@ -29,6 +30,15 @@ object SleepPrefs {
 
     fun setWakeMinuteOfDay(context: Context, minuteOfDay: Int) {
         prefs(context).edit().putInt(KEY_WAKE_MINUTE_OF_DAY, minuteOfDay).apply()
+    }
+
+    /** Minutes since midnight (0-1439) TimeBar (P17) treats as "end of day" when not deriving
+     * from a planner routine — a real user-configurable value the redesign spec assumed already
+     * existed (it didn't; only [getWakeMinuteOfDay] did). */
+    fun getSleepMinuteOfDay(context: Context): Int = prefs(context).getInt(KEY_SLEEP_MINUTE_OF_DAY, 23 * 60)
+
+    fun setSleepMinuteOfDay(context: Context, minuteOfDay: Int) {
+        prefs(context).edit().putInt(KEY_SLEEP_MINUTE_OF_DAY, minuteOfDay).apply()
     }
 
     fun getUseRoutineSleepWindow(context: Context): Boolean = prefs(context).getBoolean(KEY_USE_ROUTINE, false)
