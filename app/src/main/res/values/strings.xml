@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Slay Task</string>
     <string name="accessibility_service_description">Lets Slay Task notice the moment a limited app opens, so it can lock it instantly instead of checking every second or two. It only reads which app is in the foreground — never screen content, text, or what you tap. Optional: the app still works without this, just slightly less instantly.</string>
+    <string name="shortcut_capture_short_label">Capture</string>
+    <string name="shortcut_capture_long_label">Capture a thought</string>
 </resources>

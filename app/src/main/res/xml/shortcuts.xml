@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static launcher shortcut (P7) — long-press the app icon to jump straight into capture.
+     Reuses the shield artwork as its icon, matching P6a's "same icon, same meaning" convention
+     for capture everywhere else in the app. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="capture"
+        android:enabled="true"
+        android:icon="@drawable/ic_shield_custom"
+        android:shortcutShortLabel="@string/shortcut_capture_short_label"
+        android:shortcutLongLabel="@string/shortcut_capture_long_label">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="com.secondbrain.lock"
+            android:targetClass="com.secondbrain.lock.MainActivity">
+            <extra android:name="open_capture" android:value="true" />
+        </intent>
+    </shortcut>
+</shortcuts>

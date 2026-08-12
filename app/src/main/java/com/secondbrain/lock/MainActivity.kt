@@ -1,6 +1,7 @@
 package com.secondbrain.lock
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -21,6 +22,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -77,20 +79,46 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+    // A counter, not a Boolean: launchMode="singleTask" means a second launch (widget tap,
+    // launcher shortcut tap while already running) delivers onNewIntent, not a fresh onCreate —
+    // RootApp's LaunchedEffect below keys on this value, so it needs to change on every deep
+    // link, not just flip true once and never fire again on a repeat.
+    private var openCaptureTrigger by mutableIntStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleIntent(intent)
         setContent {
             SecondBrainLockTheme {
-                RootApp()
+                RootApp(openCaptureTrigger = openCaptureTrigger)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent) {
+        if (intent.getBooleanExtra(EXTRA_OPEN_CAPTURE, false)) {
+            openCaptureTrigger++
+        }
+    }
+
+    companion object {
+        /** Set by the static launcher shortcut (res/xml/shortcuts.xml) and the Sectograph
+         * widget's capture button (widget/SectographWidget.kt) — both just launch MainActivity
+         * with this extra rather than needing a real deep-link/URI scheme for one boolean flag. */
+        const val EXTRA_OPEN_CAPTURE = "open_capture"
     }
 }
 
 private enum class SettingsTab { DASHBOARD, ADD_APP, SETTINGS }
 
 @Composable
-private fun RootApp() {
+private fun RootApp(openCaptureTrigger: Int = 0) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -193,6 +221,13 @@ private fun RootApp() {
 
     var showFastCapture by remember { mutableStateOf(false) }
     var showFullCapture by remember { mutableStateOf(false) }
+    // P7: the launcher shortcut and widget capture button both deep-link here. Not reachable
+    // while logged out (this whole block is past the auth early-return above) — an edge case
+    // worth a comment, not worth blocking on: the deep link is just silently dropped and the
+    // user lands on a normal login screen instead.
+    LaunchedEffect(openCaptureTrigger) {
+        if (openCaptureTrigger > 0) showFastCapture = true
+    }
 
     // The Mindverse room is a full-screen call takeover (its own camera-grid/controls bottom
     // chrome) — showing the app's own bottom nav bar underneath it as well would double up on
