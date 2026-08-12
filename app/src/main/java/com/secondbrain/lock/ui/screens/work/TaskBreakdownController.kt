@@ -87,6 +87,20 @@ internal class TaskBreakdownController(
         error = null
     }
 
+    /** Seeds an already-open breakdown flow directly with rows fetched elsewhere (P14's "Make
+     * these separate tasks instead" escape hatch redirects FocusReadyScreen's own AI suggestions
+     * here) — avoids calling the breakdown endpoint a second time for the identical rows, which
+     * would burn additional quota and could return a different result than what's on screen. */
+    fun seed(task: Task, seededRows: List<BreakdownRow>, seededRemainingToday: Int?) {
+        taskId = task.id
+        parentTask = task
+        rows = seededRows
+        remainingToday = seededRemainingToday
+        error = null
+        loading = false
+        baseMin = task.startMin?.let { it + (task.durationMin ?: 0) } ?: currentMinuteOfDay()
+    }
+
     /** Cumulative start minute for [row], computed live from the current row order — recursion
      * (splicing a subtask's own further breakdown in at its position) naturally gets correct
      * stacking for free since this always walks the live list, never a cached value. */
