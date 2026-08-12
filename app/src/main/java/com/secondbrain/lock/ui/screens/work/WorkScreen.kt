@@ -123,16 +123,19 @@ fun WorkScreen(
             Spacer(Modifier.height(16.dp))
             MorningBriefSection()
             Spacer(Modifier.height(16.dp))
-            NudgesStrip(onOpenTask = { id -> highlightTaskId = id })
-            Spacer(Modifier.height(16.dp))
-            RewardPanel(stats, onOpenDetail = onOpenStreak)
-            Spacer(Modifier.height(16.dp))
+            // P10: the first screenful is an action (TasksPanel), not a score — RewardPanel's
+            // full card moved below the fold as StreakStrip, a one-line collapsed presentation.
+            // "Nothing that scores the user renders above the fold" going forward, per CLAUDE.md.
             TasksPanel(
                 onCompletion = ::handleCompletion,
                 highlightTaskId = highlightTaskId,
                 onHighlightConsumed = { highlightTaskId = null },
                 onSeeAll = onOpenAllTasks
             )
+            Spacer(Modifier.height(16.dp))
+            NudgesStrip(onOpenTask = { id -> highlightTaskId = id })
+            Spacer(Modifier.height(16.dp))
+            StreakStrip(stats, onOpenDetail = onOpenStreak)
             Spacer(Modifier.height(16.dp))
             RoutinePlanner()
             Spacer(Modifier.height(32.dp))
