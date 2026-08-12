@@ -29,7 +29,15 @@ enum class Destination(
     companion object {
         // SHIELD is intentionally left off the bottom bar for now (still reachable via the top
         // bar's settings gear) — 4 evenly-split tabs reads better around the center "+" notch.
-        val bottomBarOrder = listOf(WORK, ORGANIZE, MIND, MINDVERSE)
+        //
+        // A `get()`, not a cached `val` (P11) — MINDVERSE is gated behind CommunityState.enabled
+        // (defaults off: cross-account live chat/video with no moderation/reporting/blocking
+        // yet), and this needs to react live when that toggle flips, the same reason every theme
+        // color in ui/theme/Color.kt is a getter and not a cached val. Dropping to 3 tabs makes
+        // BottomBar's notch layout asymmetric (built for an even split) — accepted for this
+        // prompt, the full nav rebalance is P21.
+        val bottomBarOrder: List<Destination>
+            get() = if (CommunityState.enabled) listOf(WORK, ORGANIZE, MIND, MINDVERSE) else listOf(WORK, ORGANIZE, MIND)
 
         fun fromRoute(route: String?): Destination = entries.find { it.route == route } ?: WORK
     }

@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import coil.Coil
 import coil.ImageLoader
+import com.secondbrain.lock.data.CommunityPrefs
 import com.secondbrain.lock.data.LocalCache
 import com.secondbrain.lock.data.SecurePrefs
 import com.secondbrain.lock.data.SyncQueue
@@ -24,6 +25,7 @@ import com.secondbrain.lock.network.ApiClient
 import com.secondbrain.lock.service.Overlays
 import com.secondbrain.lock.service.ReminderScheduler
 import com.secondbrain.lock.service.SbMessagingService
+import com.secondbrain.lock.ui.nav.CommunityState
 import com.secondbrain.lock.ui.theme.SbThemeState
 import com.secondbrain.lock.ui.theme.ThemeMode
 import com.secondbrain.lock.widget.SectographUpdateWorker
@@ -74,6 +76,7 @@ class LockApp : Application() {
         // pointed at an authenticated endpoint like /api/auth/avatar just works.
         Coil.setImageLoader(ImageLoader.Builder(this).okHttpClient(ApiClient.client).build())
         SbThemeState.mode = ThemeMode.fromStorageKey(SecurePrefs.getTheme(this))
+        CommunityState.enabled = CommunityPrefs.isEnabled(this)
         SectographUpdateWorker.schedulePeriodic(this)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

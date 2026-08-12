@@ -2,6 +2,7 @@ package com.secondbrain.lock.ui.nav
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -80,14 +81,33 @@ fun AppNavHost(
             MindScreen(onOpenNote = openNote, contentPadding = contentPadding, topBar = topBar)
         }
         composable(Destination.MINDVERSE.route) {
-            MindverseScreen(
-                contentPadding = contentPadding,
-                topBar = topBar,
-                onOpenRoom = { navController.navigate(MINDVERSE_ROOM_ROUTE) }
-            )
+            // P11 route guard — a deep link (or a stale nav state from before the setting was
+            // turned off) must not reach this screen either, not just the bottom bar hiding the
+            // tab. Bounces straight back to Work rather than rendering anything.
+            if (CommunityState.enabled) {
+                MindverseScreen(
+                    contentPadding = contentPadding,
+                    topBar = topBar,
+                    onOpenRoom = { navController.navigate(MINDVERSE_ROOM_ROUTE) }
+                )
+            } else {
+                LaunchedEffect(Unit) {
+                    navController.navigate(Destination.WORK.route) {
+                        popUpTo(Destination.MINDVERSE.route) { inclusive = true }
+                    }
+                }
+            }
         }
         composable(MINDVERSE_ROOM_ROUTE) {
-            MindverseRoomScreen(onBack = { navController.popBackStack() }, contentPadding = contentPadding)
+            if (CommunityState.enabled) {
+                MindverseRoomScreen(onBack = { navController.popBackStack() }, contentPadding = contentPadding)
+            } else {
+                LaunchedEffect(Unit) {
+                    navController.navigate(Destination.WORK.route) {
+                        popUpTo(MINDVERSE_ROOM_ROUTE) { inclusive = true }
+                    }
+                }
+            }
         }
         composable(Destination.SHIELD.route) { shieldContent(contentPadding) }
         composable(ACCOUNT_SETTINGS_ROUTE) { accountSettingsContent(contentPadding) }

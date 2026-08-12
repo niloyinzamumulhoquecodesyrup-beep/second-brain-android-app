@@ -39,6 +39,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.secondbrain.lock.data.AppLimit
 import com.secondbrain.lock.data.AppLimitRepository
+import com.secondbrain.lock.data.CommunityPrefs
 import com.secondbrain.lock.data.InstalledAppInfo
 import com.secondbrain.lock.data.InstalledAppsRepository
 import com.secondbrain.lock.data.LocalCache
@@ -54,6 +55,7 @@ import com.secondbrain.lock.service.SbMessagingService
 import com.secondbrain.lock.ui.nav.ACCOUNT_SETTINGS_ROUTE
 import com.secondbrain.lock.ui.nav.AppNavHost
 import com.secondbrain.lock.ui.nav.BottomBar
+import com.secondbrain.lock.ui.nav.CommunityState
 import com.secondbrain.lock.ui.nav.Destination
 import com.secondbrain.lock.ui.nav.MINDVERSE_ROOM_ROUTE
 import com.secondbrain.lock.ui.nav.FastCaptureSheet
@@ -494,7 +496,15 @@ private fun SettingsFlow(contentPadding: PaddingValues = PaddingValues(), topBar
                 },
                 exactAlarmGranted = remember(settingsResumeTick) { Permissions.hasExactAlarm(context) },
                 alarmSchedulingFailed = remember(settingsResumeTick) { SleepPrefs.isAlarmSchedulingFailed(context) },
-                onFixExactAlarm = { context.startActivity(Permissions.exactAlarmIntent(context)) }
+                onFixExactAlarm = { context.startActivity(Permissions.exactAlarmIntent(context)) },
+                // Reads CommunityState directly (not a local remember) — it's already the live,
+                // observable source of truth Destination.bottomBarOrder and the nav guard read
+                // from too, so this toggle and the bottom bar can never disagree.
+                communityEnabled = CommunityState.enabled,
+                onToggleCommunity = { enabled ->
+                    CommunityState.enabled = enabled
+                    CommunityPrefs.setEnabled(context, enabled)
+                }
             )
         }
     }

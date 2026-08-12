@@ -58,7 +58,9 @@ fun SettingsScreen(
     onWakeMinuteChange: (Int) -> Unit,
     exactAlarmGranted: Boolean,
     alarmSchedulingFailed: Boolean,
-    onFixExactAlarm: () -> Unit
+    onFixExactAlarm: () -> Unit,
+    communityEnabled: Boolean,
+    onToggleCommunity: (Boolean) -> Unit
 ) {
     Column(modifier = Modifier.fullAuraBackground().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 28.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -183,6 +185,18 @@ fun SettingsScreen(
                     }
                 }
             }
+        }
+
+        Spacer(Modifier.height(24.dp))
+        SbSectionTitle("Community", color = StreakAccent)
+        Spacer(Modifier.height(10.dp))
+        SbCard(topBorderColor = if (communityEnabled) StreakAccent else null) {
+            SettingsToggleRow(
+                "Community rooms",
+                "Live chat and video with other users. Can be distracting.",
+                communityEnabled,
+                onToggleCommunity
+            )
         }
         Spacer(Modifier.height(48.dp))
     }
