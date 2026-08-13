@@ -5,6 +5,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -73,7 +74,8 @@ private val FilletRadius = 24.dp
 private val BarHeight = 72.dp
 
 /**
- * 4-tab bottom nav (Work/Organize/Mind/Mindverse). The center button is capture, not a nav item —
+ * 3-tab bottom nav (Today/Library/Me — P21, collapsed from the original 4). The center button is
+ * capture, not a nav item —
  * tap opens [com.secondbrain.lock.ui.nav.FastCaptureSheet] to type, long-press is reserved for
  * voice capture once [com.secondbrain.lock.util.VoiceTranscriber] is wired into that sheet (P12) —
  * until then it just opens the same sheet as a tap, per that prompt's own explicit fallback rather
@@ -98,12 +100,19 @@ private val BarHeight = 72.dp
 fun BottomBar(navController: NavHostController, onCapture: (voice: Boolean) -> Unit, modifier: Modifier = Modifier) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.hierarchy?.firstOrNull()?.route
-    val leftDestinations = Destination.bottomBarOrder.take(2)
-    val rightDestinations = Destination.bottomBarOrder.drop(2)
-    val barShape = NotchedTopBarShape(BarCornerRadius, NotchRadius, FilletRadius)
+    // P21: 3 tabs (Today / gap / Library / Me — 4 equal-weight slots, 1 tab left of the gap, 2
+    // right), not the old even 2-and-2 split. The notch's horizontal center moves to the middle
+    // of the gap slot accordingly — NOT bar-center anymore. See NotchedTopBarShape's KDoc: only
+    // this center position changes, its arc math is untouched.
+    val leftDestinations = Destination.bottomBarOrder.take(1)
+    val rightDestinations = Destination.bottomBarOrder.drop(1)
+    val totalSlots = leftDestinations.size + 1 + rightDestinations.size
+    val notchCenterFraction = (leftDestinations.size + 0.5f) / totalSlots
+    val barShape = NotchedTopBarShape(BarCornerRadius, NotchRadius, FilletRadius, notchCenterFraction)
     val context = LocalContext.current
 
-    Box(modifier.fillMaxWidth()) {
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val buttonCenterX = maxWidth * notchCenterFraction
         NavigationBar(
             containerColor = NavBarSurface,
             tonalElevation = 0.dp,
@@ -125,17 +134,18 @@ fun BottomBar(navController: NavHostController, onCapture: (voice: Boolean) -> U
             leftDestinations.forEach { destination -> BarItem(destination, currentRoute, navController, colors) }
             // Reserves the same width as one nav item so the raised button below has clearance —
             // together with each NavigationBarItem's own internal weight(1f), this splits the bar
-            // into 6 even slots (2 tabs, gap, 3 tabs).
+            // into 4 even slots (1 tab, gap, 2 tabs).
             Box(Modifier.weight(1f, fill = true))
             rightDestinations.forEach { destination -> BarItem(destination, currentRoute, navController, colors) }
         }
 
         Box(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                // Same horizontal center the notch arc uses; vertically lifted by [ButtonLift]
-                // rather than a full ButtonRadius, so the button sits closer to the bar.
-                .offset(y = -ButtonLift)
+                .align(Alignment.TopStart)
+                // Same horizontal center the notch arc uses (no longer bar-center); vertically
+                // lifted by [ButtonLift] rather than a full ButtonRadius, so the button sits
+                // closer to the bar.
+                .offset(x = buttonCenterX - ButtonRadius, y = -ButtonLift)
                 .size(ButtonSize)
                 .shadow(elevation = 6.dp, shape = CircleShape)
                 .clip(CircleShape)
@@ -190,13 +200,18 @@ fun BottomBar(navController: NavHostController, onCapture: (voice: Boolean) -> U
 private class NotchedTopBarShape(
     private val topCornerRadius: Dp,
     private val notchRadius: Dp,
-    private val filletRadius: Dp
+    private val filletRadius: Dp,
+    // P21: fraction of the bar's width where the notch is centered — 0.5 = dead center (the
+    // original 2-tabs/2-tabs layout); the 3-tab layout's 1-tab/2-tabs split moves this off
+    // center. Everything below this line is exactly the original, verified arc construction,
+    // just parameterized on centerX instead of a hardcoded size.width / 2f.
+    private val centerXFraction: Float = 0.5f
 ) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val corner = with(density) { topCornerRadius.toPx() }
         val r1 = with(density) { notchRadius.toPx() }
         val f = with(density) { filletRadius.toPx() }
-        val centerX = size.width / 2f
+        val centerX = size.width * centerXFraction
 
         // Distance from the notch's center to where each fillet meets the flat edge — the
         // standard "circle-tangent-to-a-line-and-to-another-circle" fillet construction.

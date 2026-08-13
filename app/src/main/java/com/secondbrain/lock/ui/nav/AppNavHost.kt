@@ -16,6 +16,7 @@ import com.secondbrain.lock.ui.screens.mindverse.MindverseRoomScreen
 import com.secondbrain.lock.ui.screens.mindverse.MindverseScreen
 import com.secondbrain.lock.ui.screens.organize.NoteDetailScreen
 import com.secondbrain.lock.ui.screens.organize.OrganizeScreen
+import com.secondbrain.lock.ui.screens.MeScreen
 import com.secondbrain.lock.ui.screens.organize.SortPassScreen
 import com.secondbrain.lock.ui.screens.work.AllTasksScreen
 import com.secondbrain.lock.ui.screens.work.StreakDetailScreen
@@ -40,9 +41,12 @@ const val MINDVERSE_ROOM_ROUTE = "mindverse_room"
 const val SORT_PASS_ROUTE = "sort_pass"
 
 /**
- * The 5 top-level tabs, plus a "note/{noteId}" detail route pushed on top from Organize (and
- * recursively from note detail's own links/related). Shield reuses the existing onboarding/
- * dashboard flow verbatim so app-blocking setup isn't regressed by this rewrite.
+ * P21: 3 bottom-bar tabs (Today/Library/Me), plus several non-bottom-bar routes still reachable
+ * by navigating directly — Mind and Mindverse (no longer in [Destination.bottomBarOrder], but
+ * their content hasn't been migrated anywhere else yet, see [MeScreen]'s KDoc), Shield, account
+ * settings, and a "note/{noteId}" detail route pushed on top from Library (and recursively from
+ * note detail's own links/related). Shield reuses the existing onboarding/dashboard flow verbatim
+ * so app-blocking setup isn't regressed by this rewrite.
  */
 @Composable
 fun AppNavHost(
@@ -59,12 +63,12 @@ fun AppNavHost(
     // result to a previous screen" pattern) then pop everything back down to it, so a tag
     // tapped from a note reached via several link hops still lands cleanly on Organize.
     val openTag: (String) -> Unit = { tag ->
-        navController.getBackStackEntry(Destination.ORGANIZE.route).savedStateHandle["tag"] = tag
-        navController.popBackStack(Destination.ORGANIZE.route, inclusive = false)
+        navController.getBackStackEntry(Destination.LIBRARY.route).savedStateHandle["tag"] = tag
+        navController.popBackStack(Destination.LIBRARY.route, inclusive = false)
     }
 
-    NavHost(navController = navController, startDestination = Destination.WORK.route, modifier = modifier) {
-        composable(Destination.WORK.route) {
+    NavHost(navController = navController, startDestination = Destination.TODAY.route, modifier = modifier) {
+        composable(Destination.TODAY.route) {
             WorkScreen(
                 contentPadding = contentPadding,
                 onOpenStreak = { navController.navigate(STREAK_DETAIL_ROUTE) },
@@ -72,7 +76,7 @@ fun AppNavHost(
                 topBar = topBar
             )
         }
-        composable(Destination.ORGANIZE.route) { backStackEntry ->
+        composable(Destination.LIBRARY.route) { backStackEntry ->
             val tag by backStackEntry.savedStateHandle.getStateFlow<String?>("tag", null).collectAsState()
             OrganizeScreen(
                 onOpenNote = openNote,
@@ -101,7 +105,7 @@ fun AppNavHost(
                 )
             } else {
                 LaunchedEffect(Unit) {
-                    navController.navigate(Destination.WORK.route) {
+                    navController.navigate(Destination.TODAY.route) {
                         popUpTo(Destination.MINDVERSE.route) { inclusive = true }
                     }
                 }
@@ -112,7 +116,7 @@ fun AppNavHost(
                 MindverseRoomScreen(onBack = { navController.popBackStack() }, contentPadding = contentPadding)
             } else {
                 LaunchedEffect(Unit) {
-                    navController.navigate(Destination.WORK.route) {
+                    navController.navigate(Destination.TODAY.route) {
                         popUpTo(MINDVERSE_ROOM_ROUTE) { inclusive = true }
                     }
                 }
@@ -120,6 +124,17 @@ fun AppNavHost(
         }
         composable(Destination.SHIELD.route) { shieldContent(contentPadding) }
         composable(ACCOUNT_SETTINGS_ROUTE) { accountSettingsContent(contentPadding) }
+        composable(Destination.ME.route) {
+            MeScreen(
+                onOpenStats = { navController.navigate(STREAK_DETAIL_ROUTE) },
+                onOpenShield = { navController.navigate(Destination.SHIELD.route) },
+                onOpenAccountSettings = { navController.navigate(ACCOUNT_SETTINGS_ROUTE) },
+                onOpenMind = { navController.navigate(Destination.MIND.route) },
+                onOpenMindverse = { navController.navigate(Destination.MINDVERSE.route) },
+                contentPadding = contentPadding,
+                topBar = topBar
+            )
+        }
         composable(STREAK_DETAIL_ROUTE) {
             StreakDetailScreen(onBack = { navController.popBackStack() }, contentPadding = contentPadding)
         }
