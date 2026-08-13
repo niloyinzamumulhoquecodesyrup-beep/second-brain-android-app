@@ -407,7 +407,7 @@ private fun MilestonesList(computed: RewardComputation) {
                 Column(Modifier.weight(1f)) {
                     Text(milestone.badge.label, color = if (milestone.achieved) Mist100 else Mist300, fontSize = 14.sp)
                     when {
-                        milestone.achieved -> Text("Achieved", color = StreakAccent, fontSize = 12.sp)
+                        milestone.achieved -> Text("Achieved", color = Mist300, fontSize = 12.sp)
                         milestone.progress > 0f -> {
                             Spacer(Modifier.height(6.dp))
                             Box(Modifier.fillMaxWidth(0.5f).height(5.dp).clip(RoundedCornerShape(4.dp)).background(Ink700)) {

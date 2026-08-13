@@ -65,7 +65,7 @@ fun GoalArrowChart(goals: List<MindInsight>, onOpenNote: (String) -> Unit) {
     var activeId by remember { mutableStateOf<String?>(null) }
 
     StreakSurface {
-        SbSectionTitle("Inferred goals", color = StreakAccent)
+        SbSectionTitle("Inferred goals", color = Mist300)
         Spacer(Modifier.height(14.dp))
         if (goals.isEmpty()) {
             Text("No goals inferred yet.", color = Mist400, style = SecondBrainTypography.bodySmall)

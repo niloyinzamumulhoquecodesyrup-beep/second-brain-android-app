@@ -42,7 +42,9 @@ val SecondBrainTypography = Typography(
         fontFamily = SansBody,
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
-        letterSpacing = 2.sp
+        // P24: wide tracking on 11sp text is elegant but measurably slower to read, and this
+        // codebase uses labelSmall for nearly every section header.
+        letterSpacing = 1.sp
     ),
     bodyLarge = TextStyle(
         fontFamily = SansBody,

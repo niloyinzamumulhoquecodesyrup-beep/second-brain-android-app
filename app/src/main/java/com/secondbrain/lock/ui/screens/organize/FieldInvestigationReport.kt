@@ -94,7 +94,7 @@ fun FieldInvestigationReport(recommendations: List<MindInsight>, onOpenNote: (St
 
     StreakSurface {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            SbSectionTitle("Field investigation report", color = StreakAccent)
+            SbSectionTitle("Field investigation report", color = Mist300)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { page = (index - 1 + recommendations.size) % recommendations.size }, modifier = Modifier.size(26.dp)) {
                     Text("‹", color = Mist300, fontSize = 18.sp)
@@ -308,7 +308,7 @@ private fun PathList(path: PathInfo) {
 
     Column(Modifier.padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         path.topic?.let {
-            Text(it.uppercase(), color = StreakAccent, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start))
+            Text(it.uppercase(), color = Mist300, fontSize = 11.sp, modifier = Modifier.align(Alignment.Start))
             Spacer(Modifier.height(6.dp))
         }
 

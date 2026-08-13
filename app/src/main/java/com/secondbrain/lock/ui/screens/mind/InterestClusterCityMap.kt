@@ -87,7 +87,7 @@ fun InterestClusterCityMap(
     var selected by remember(cities) { mutableStateOf<Building?>(null) }
 
     StreakSurface {
-        SbSectionTitle("Interest cluster", color = StreakAccent)
+        SbSectionTitle("Interest cluster", color = Mist300)
         Spacer(Modifier.height(4.dp))
         Text("drag to pan · pinch to zoom for names", color = Mist400, fontSize = 11.sp)
         Spacer(Modifier.height(10.dp))

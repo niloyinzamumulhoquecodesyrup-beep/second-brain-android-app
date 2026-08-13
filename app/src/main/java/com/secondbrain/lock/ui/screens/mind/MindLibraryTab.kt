@@ -100,7 +100,7 @@ fun MindLibraryTab(onOpenNote: (String) -> Unit) {
     }
 
     StreakSurface {
-        SbSectionTitle("Recently reinforced", color = StreakAccent)
+        SbSectionTitle("Recently reinforced", color = Mist300)
         Spacer(Modifier.height(10.dp))
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             recentlyReinforced.forEach { entry ->
@@ -136,7 +136,7 @@ fun MindLibraryTab(onOpenNote: (String) -> Unit) {
     }
 
     Spacer(Modifier.height(12.dp))
-    SbLabel("${domainFilter ?: "Library"} (${filtered.size})", color = StreakAccent)
+    SbLabel("${domainFilter ?: "Library"} (${filtered.size})", color = Mist300)
     Spacer(Modifier.height(8.dp))
     if (filtered.isEmpty()) {
         Text("No entries match.", color = Mist400, style = SecondBrainTypography.bodySmall)
@@ -156,7 +156,7 @@ fun MindLibraryTab(onOpenNote: (String) -> Unit) {
 
     Spacer(Modifier.height(6.dp))
     StreakSurface {
-        SbSectionTitle("Domains", color = StreakAccent)
+        SbSectionTitle("Domains", color = Mist300)
         Spacer(Modifier.height(8.dp))
         domains.forEach { (domain, count) ->
             val active = domainFilter == domain

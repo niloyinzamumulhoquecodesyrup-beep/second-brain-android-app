@@ -60,7 +60,7 @@ internal fun authFieldColors() = OutlinedTextFieldDefaults.colors(
 internal fun AuthHeader(eyebrow: String, title: String) {
     Text("Slay Task", color = Mist100, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
     Spacer(Modifier.height(20.dp))
-    SbSectionTitle(eyebrow, color = StreakAccent)
+    SbSectionTitle(eyebrow, color = Mist300)
     Spacer(Modifier.height(8.dp))
     Text(title, color = Mist100, fontSize = 28.sp, fontWeight = FontWeight.Light)
 }

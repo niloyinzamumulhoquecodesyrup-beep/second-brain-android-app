@@ -880,7 +880,7 @@ private fun PersonRow(avatarKey: String, name: String, highlight: Boolean = fals
         Spacer(Modifier.width(12.dp))
         Text(name, color = RoomTextPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
         if (highlight) {
-            Text("YOU", color = StreakAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Text("YOU", color = RoomTextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         }
     }
 }

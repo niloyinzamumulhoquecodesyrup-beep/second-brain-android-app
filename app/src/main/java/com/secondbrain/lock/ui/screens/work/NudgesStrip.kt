@@ -88,7 +88,7 @@ fun NudgesStrip(onOpenTask: (String) -> Unit = {}) {
                 Column(Modifier.weight(1f)) {
                     SbSectionTitle(
                         if (isSuggestion) "Worth locking in?" else "When you're ready",
-                        color = StreakAccent,
+                        color = Mist300,
                         uppercase = false
                     )
                     Spacer(Modifier.height(4.dp))

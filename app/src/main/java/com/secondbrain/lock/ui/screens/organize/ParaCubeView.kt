@@ -221,7 +221,7 @@ fun ParaCubeView(
     val onTick: () -> Unit = { FeedbackUtil.spinTick(context) }
 
     StreakSurface {
-        SbSectionTitle("P . A . R . A .", color = StreakAccent)
+        SbSectionTitle("P . A . R . A .", color = Mist300)
         Spacer(Modifier.height(16.dp))
 
         val density = LocalDensity.current
@@ -384,7 +384,7 @@ private fun Flap3D(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     face.label.uppercase(),
-                    color = StreakAccent,
+                    color = Mist300,
                     fontSize = 11.5.sp,
                     letterSpacing = 1.4.sp,
                     fontWeight = FontWeight.Bold

@@ -174,7 +174,7 @@ private fun EditProfileSection(name: String?, email: String, hasAvatar: Boolean)
         if (uri != null) cropUri = uri
     }
 
-    SbSectionTitle("Edit profile", color = StreakAccent)
+    SbSectionTitle("Edit profile", color = Mist300)
     Spacer(Modifier.height(10.dp))
     SbCard {
         Box(
@@ -441,7 +441,7 @@ private fun ChangePasswordSection() {
     var error by remember { mutableStateOf<String?>(null) }
     var success by remember { mutableStateOf(false) }
 
-    SbSectionTitle("Change password", color = StreakAccent)
+    SbSectionTitle("Change password", color = Mist300)
     Spacer(Modifier.height(10.dp))
     SbCard {
         OutlinedTextField(
@@ -532,7 +532,7 @@ private fun NotificationsSection() {
         TimePickerDialog(context, { _, hourOfDay, minute -> onPicked(hourOfDay * 60 + minute) }, base / 60, base % 60, false).show()
     }
 
-    SbSectionTitle("Notifications", color = StreakAccent)
+    SbSectionTitle("Notifications", color = Mist300)
     Spacer(Modifier.height(10.dp))
     SbCard {
         Text(
@@ -600,7 +600,7 @@ private fun HapticsAndSoundsSection() {
     var hapticsEnabled by remember { mutableStateOf(SoundHapticsPrefs.isHapticsEnabled(context)) }
     var soundsEnabled by remember { mutableStateOf(SoundHapticsPrefs.isSoundsEnabled(context)) }
 
-    SbSectionTitle("Haptics & sounds", color = StreakAccent)
+    SbSectionTitle("Haptics & sounds", color = Mist300)
     Spacer(Modifier.height(10.dp))
     SbCard {
         SettingsToggleRow(

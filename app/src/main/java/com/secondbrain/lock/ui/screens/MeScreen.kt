@@ -112,7 +112,7 @@ fun MeScreen(
             }
 
             Spacer(Modifier.height(20.dp))
-            SbSectionTitle("Community", color = StreakAccent)
+            SbSectionTitle("Community", color = Mist300)
             Spacer(Modifier.height(10.dp))
             SbCard {
                 Row(

@@ -111,7 +111,7 @@ fun MindNewsTicker(items: List<NewsItem>) {
                 .background(StreakAccent.copy(alpha = 0.1f))
                 .padding(horizontal = 10.dp, vertical = 10.dp)
         ) {
-            Text("LATEST", color = StreakAccent, fontSize = 11.sp, letterSpacing = 2.sp)
+            Text("LATEST", color = Mist300, fontSize = 11.sp, letterSpacing = 2.sp)
         }
         Row(
             modifier = Modifier

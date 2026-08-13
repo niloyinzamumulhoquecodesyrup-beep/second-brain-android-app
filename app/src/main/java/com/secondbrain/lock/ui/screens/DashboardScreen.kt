@@ -125,7 +125,7 @@ fun DashboardScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SbSectionTitle("App limits", color = StreakAccent)
+                    SbSectionTitle("App limits", color = Mist300)
                     Text(
                         "${rows.count { it.usedMillis >= it.limit.dailyLimitMinutes * 60_000L }} locked · ${rows.size} monitored",
                         style = SecondBrainTypography.bodySmall,

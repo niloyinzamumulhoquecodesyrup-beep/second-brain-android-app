@@ -96,7 +96,7 @@ internal fun StreakArrowBadge(size: androidx.compose.ui.unit.Dp, fontSize: andro
 private fun StreakSummaryCard(computed: RewardComputation, onClick: () -> Unit) {
     StreakSurface(onClick = onClick) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-            SbSectionTitle(currentHeadlinePhrase(), color = StreakAccent)
+            SbSectionTitle(currentHeadlinePhrase(), color = Mist300)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Tap for stats", color = Mist400, fontSize = 12.sp)
                 Spacer(Modifier.width(8.dp))

@@ -438,7 +438,7 @@ fun TasksPanel(
 
     SbCard {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            SbSectionTitle("Tasks", color = StreakAccent)
+            SbSectionTitle("Tasks", color = Mist300)
             SeeAllButton(onClick = onSeeAll)
         }
         Spacer(Modifier.height(4.dp))

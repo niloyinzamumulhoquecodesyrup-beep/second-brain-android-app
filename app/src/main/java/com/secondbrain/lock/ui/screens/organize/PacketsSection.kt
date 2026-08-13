@@ -54,7 +54,7 @@ fun PacketsSection(packets: List<Packet>, onOpenNote: (String) -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             SbIconChip("📦", StreakAccent)
             Spacer(Modifier.width(10.dp))
-            SbSectionTitle("Packets", color = StreakAccent)
+            SbSectionTitle("Packets", color = Mist300)
         }
         Spacer(Modifier.height(14.dp))
         packets.forEachIndexed { index, packet ->

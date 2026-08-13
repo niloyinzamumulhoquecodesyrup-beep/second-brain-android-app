@@ -84,7 +84,7 @@ fun MindOverviewTab(onOpenNote: (String) -> Unit) {
 
     Spacer(Modifier.height(16.dp))
     StreakSurface {
-        SbSectionTitle("Attention patterns", color = StreakAccent)
+        SbSectionTitle("Attention patterns", color = Mist300)
         Spacer(Modifier.height(10.dp))
         AttentionChart(stats?.capturesByDay.orEmpty(), insights?.byKind?.attentionPattern?.firstOrNull()?.summary)
     }
@@ -154,7 +154,7 @@ private val PARA_LABELS = mapOf(
 private fun WholePictureCard(stats: Stats?, overview: MindInsight?) {
     var showText by remember { mutableStateOf(false) }
     StreakSurface {
-        SbSectionTitle("The whole picture", color = StreakAccent)
+        SbSectionTitle("The whole picture", color = Mist300)
         Spacer(Modifier.height(10.dp))
         if (stats == null) {
             Text("Loading…", color = Mist400, style = SecondBrainTypography.bodySmall)
@@ -259,7 +259,7 @@ private fun RemindersCard(openLoop: List<MindInsight>, onOpenNote: (String) -> U
     var added by remember { mutableStateOf(setOf<String>()) }
 
     StreakSurface {
-        SbSectionTitle("Reminders", color = StreakAccent)
+        SbSectionTitle("Reminders", color = Mist300)
         Spacer(Modifier.height(10.dp))
         if (openLoop.isEmpty()) {
             Text("No reminders right now.", color = Mist400, style = SecondBrainTypography.bodySmall)

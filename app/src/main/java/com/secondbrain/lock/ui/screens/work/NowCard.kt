@@ -307,7 +307,9 @@ private fun NowCardActive(
     NowCardShell {
         Text(
             if (timeLabel != null) "$eyebrow · $timeLabel" else eyebrow,
-            color = StreakAccent,
+            // P24: StreakAccent as text below 18sp fails AA contrast (3.87:1) — a fill color,
+            // not a text color. Eyebrow labels like this one use Mist300 instead.
+            color = Mist300,
             style = SecondBrainTypography.labelSmall,
             letterSpacing = 1.sp
         )
@@ -384,7 +386,9 @@ private fun NowCardUpcoming(
     NowCardShell {
         Text(
             "NEXT · ${formatMinuteOfDay(startMin)}",
-            color = StreakAccent,
+            // P24: StreakAccent as text below 18sp fails AA contrast (3.87:1) — a fill color,
+            // not a text color. Eyebrow labels like this one use Mist300 instead.
+            color = Mist300,
             style = SecondBrainTypography.labelSmall,
             letterSpacing = 1.sp
         )

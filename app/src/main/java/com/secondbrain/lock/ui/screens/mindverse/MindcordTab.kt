@@ -22,6 +22,7 @@ import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist400
 import com.secondbrain.lock.ui.theme.SbLabel
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
+import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.StreakAccent
 import kotlinx.coroutines.launch
 
@@ -54,7 +55,7 @@ private fun RoomPicker(domains: List<MindcordDomain>) {
     val scope = rememberCoroutineScope()
 
     StreakSurface {
-        SbLabel("Join a room", color = StreakAccent)
+        SbLabel("Join a room", color = Mist300)
         Spacer(Modifier.height(8.dp))
         Text(
             "Pick a domain to drop into a live text chat with whoever else is studying it right now.",

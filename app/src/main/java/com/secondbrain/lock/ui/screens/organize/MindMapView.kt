@@ -48,6 +48,7 @@ import com.secondbrain.lock.ui.theme.Mist400
 import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SbThemeState
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
+import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.StreakAccent
 import com.secondbrain.lock.ui.theme.ThemeMode
 import kotlin.math.PI
@@ -112,7 +113,7 @@ fun MindMapView(onOpenNote: (String) -> Unit) {
     StreakSurface {
         val aiEdgeCount = graph?.edges?.count { it.type == "ai" } ?: 0
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            SbSectionTitle("Notes map", color = StreakAccent)
+            SbSectionTitle("Notes map", color = Mist300)
             if (aiEdgeCount > 0) {
                 Text(
                     "AI connections: ${if (showAi) "on" else "off"}",

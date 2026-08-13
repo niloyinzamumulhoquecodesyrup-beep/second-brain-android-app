@@ -287,7 +287,7 @@ private fun WelcomeStepScaffold(title: String, onSkip: () -> Unit, content: @Com
 
 @Composable
 private fun MinutePicker(label: String, minute: Int, onChange: (Int) -> Unit) {
-    SbSectionTitle(label, color = StreakAccent)
+    SbSectionTitle(label, color = Mist300)
     Spacer(Modifier.height(8.dp))
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
         TextButton(onClick = { onChange(((minute - 15) + 1440) % 1440) }) {

@@ -108,7 +108,7 @@ fun RoutinePlanner() {
     var editingRoutineId by remember { mutableStateOf<String?>(null) }
 
     StreakSurface {
-        SbSectionTitle("Routines", color = StreakAccent)
+        SbSectionTitle("Routines", color = Mist300)
         Spacer(Modifier.height(10.dp))
 
         if (error != null) {

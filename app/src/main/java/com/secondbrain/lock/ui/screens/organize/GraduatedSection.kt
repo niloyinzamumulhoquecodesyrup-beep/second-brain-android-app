@@ -21,6 +21,7 @@ import com.secondbrain.lock.ui.theme.Ink800
 import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.SbSectionTitle
 import com.secondbrain.lock.ui.theme.SecondBrainTypography
+import com.secondbrain.lock.ui.theme.Mist300
 import com.secondbrain.lock.ui.theme.StreakAccent
 
 /** Ported to the Streak Section redesign's visual language (see RewardPanel/RoutinePlanner in
@@ -31,7 +32,7 @@ import com.secondbrain.lock.ui.theme.StreakAccent
 fun GraduatedSection(notes: List<Note>, onOpenNote: (String) -> Unit) {
     if (notes.isEmpty()) return
     StreakSurface {
-        SbSectionTitle("Graduated", color = StreakAccent)
+        SbSectionTitle("Graduated", color = Mist300)
         Spacer(Modifier.height(14.dp))
         notes.chunked(2).forEach { pair ->
             Row(Modifier.fillMaxWidth()) {

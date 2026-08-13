@@ -77,7 +77,7 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(24.dp))
 
-        SbSectionTitle("Schedule auto-block", color = StreakAccent)
+        SbSectionTitle("Schedule auto-block", color = Mist300)
         Spacer(Modifier.height(10.dp))
         SbCard {
             Text(
@@ -104,7 +104,7 @@ fun SettingsScreen(
         }
 
         Spacer(Modifier.height(24.dp))
-        SbSectionTitle("Instant blocking", color = StreakAccent)
+        SbSectionTitle("Instant blocking", color = Mist300)
         Spacer(Modifier.height(10.dp))
         SbCard(topBorderColor = if (accessibilityGranted) StreakAccent else null) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -132,7 +132,7 @@ fun SettingsScreen(
         }
 
         Spacer(Modifier.height(24.dp))
-        SbSectionTitle("Sleep alarm & morning check-in", color = StreakAccent)
+        SbSectionTitle("Sleep alarm & morning check-in", color = Mist300)
         Spacer(Modifier.height(10.dp))
         SbCard(topBorderColor = if (sleepAlarmEnabled) StreakAccent else null) {
             SettingsToggleRow(
@@ -172,7 +172,7 @@ fun SettingsScreen(
                 )
                 if (!useRoutineSleepWindow) {
                     Spacer(Modifier.height(18.dp))
-                    SbSectionTitle("Wake time", color = StreakAccent)
+                    SbSectionTitle("Wake time", color = Mist300)
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
                         IconButton(onClick = { onWakeMinuteChange(((wakeMinuteOfDay - 15) + 1440) % 1440) }) {
@@ -193,7 +193,7 @@ fun SettingsScreen(
         }
 
         Spacer(Modifier.height(24.dp))
-        SbSectionTitle("Community", color = StreakAccent)
+        SbSectionTitle("Community", color = Mist300)
         Spacer(Modifier.height(10.dp))
         SbCard(topBorderColor = if (communityEnabled) StreakAccent else null) {
             SettingsToggleRow(

@@ -89,7 +89,7 @@ private fun PickDisplayNameCard() {
     val scope = rememberCoroutineScope()
 
     StreakSurface {
-        SbLabel("Pick a handle", color = StreakAccent)
+        SbLabel("Pick a handle", color = Mist300)
         Spacer(Modifier.height(8.dp))
         Text(
             "MINDVERSE is cross-account and anonymous — pick a display name that isn't your email " +
