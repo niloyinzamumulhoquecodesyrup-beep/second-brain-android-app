@@ -150,7 +150,12 @@ fun WorkScreen(
             // than an overlay Box, since an overlay sibling over this same scrolling Column has
             // previously swallowed taps here (see FocusPomodoroDialog's close-icon KDoc for the
             // exact failure mode).
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                DigitalClock(modifier = Modifier.weight(1f))
                 SectographInline()
             }
             Spacer(Modifier.height(4.dp))

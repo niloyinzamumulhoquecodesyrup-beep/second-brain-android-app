@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,8 +33,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import com.secondbrain.lock.data.repo.PlannerRepository
 import com.secondbrain.lock.ui.theme.Ink950
+import com.secondbrain.lock.ui.theme.Mist100
 import com.secondbrain.lock.ui.theme.Mist300
+import com.secondbrain.lock.ui.theme.SecondBrainTypography
 import com.secondbrain.lock.widget.SectographRenderer
+import kotlinx.coroutines.delay
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * Promotes the home-screen widget's sectograph face into the app itself (P18) — same
@@ -89,4 +96,26 @@ fun SectographInline(modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+private val CLOCK_FORMAT = DateTimeFormatter.ofPattern("h:mm:ss a", Locale.US)
+
+/** Simple digital readout — h:mm:ss AM/PM, ticking every second — placed alongside
+ * [SectographInline] since the wedge face alone doesn't give an exact time at a glance. */
+@Composable
+fun DigitalClock(modifier: Modifier = Modifier) {
+    var now by remember { mutableStateOf(LocalTime.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = LocalTime.now()
+            delay(1000)
+        }
+    }
+    Text(
+        now.format(CLOCK_FORMAT),
+        color = Mist100,
+        style = SecondBrainTypography.headlineLarge,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        modifier = modifier
+    )
 }
