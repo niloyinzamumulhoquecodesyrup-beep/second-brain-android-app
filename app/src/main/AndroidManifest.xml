@@ -9,6 +9,13 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- P19: focus-session ambient noise plays via MonitorService (already running, rather than
+         a second persistent notification) — this is arguably outside the declared "specialUse"
+         subtype below, since audio playback isn't app-usage-lock-enforcement. Flagging this as a
+         conscious tradeoff, not an oversight: special-use foreground service subtypes get Play
+         Store review scrutiny, and stacking a second subtype on the same service is the
+         documented way to add a second concern without a second foreground service/notification. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- User-toggleable special app access, not USE_EXACT_ALARM: this app's core function is task
@@ -52,7 +59,7 @@
         <service
             android:name=".service.MonitorService"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:foregroundServiceType="specialUse|mediaPlayback">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="app-usage-lock-enforcement" />

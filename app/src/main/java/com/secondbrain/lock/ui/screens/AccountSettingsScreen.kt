@@ -39,6 +39,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -68,6 +69,7 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.secondbrain.lock.data.FeedbackUtil
+import com.secondbrain.lock.data.FocusAudioPreset
 import com.secondbrain.lock.data.SoundHapticsPrefs
 import com.secondbrain.lock.data.repo.ProfileRepository
 import com.secondbrain.lock.network.ApiClient
@@ -622,6 +624,38 @@ private fun HapticsAndSoundsSection() {
                 if (it) FeedbackUtil.spinTick(context)
             }
         )
+        Spacer(Modifier.height(16.dp))
+        Text("Focus sounds", style = SecondBrainTypography.titleMedium, color = Mist100)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Background noise during focus sessions. Off by default.",
+            style = SecondBrainTypography.bodySmall,
+            color = Mist400
+        )
+        Spacer(Modifier.height(10.dp))
+        var selectedFocusAudio by remember { mutableStateOf(SoundHapticsPrefs.getFocusAudioPreset(context)) }
+        val focusAudioOptions = listOf<Pair<FocusAudioPreset?, String>>(null to "Off") +
+            FocusAudioPreset.entries.map { it to it.name.lowercase().replaceFirstChar(Char::uppercase) }
+        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(focusAudioOptions) { pair ->
+                val preset = pair.first
+                val label = pair.second
+                val selected = selectedFocusAudio == preset
+                Text(
+                    label,
+                    style = SecondBrainTypography.bodySmall,
+                    color = if (selected) androidx.compose.ui.graphics.Color.White else Mist300,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(if (selected) StreakAccent else Ink600)
+                        .clickable {
+                            selectedFocusAudio = preset
+                            SoundHapticsPrefs.setFocusAudioPreset(context, preset)
+                        }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                )
+            }
+        }
     }
 }
 

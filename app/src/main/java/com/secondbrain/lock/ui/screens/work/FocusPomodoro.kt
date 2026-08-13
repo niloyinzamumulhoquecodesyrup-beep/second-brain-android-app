@@ -23,6 +23,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -58,8 +60,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.secondbrain.lock.data.FeedbackUtil
+import com.secondbrain.lock.data.FocusAudio
+import com.secondbrain.lock.data.FocusAudioPreset
 import com.secondbrain.lock.data.FocusState
+import com.secondbrain.lock.data.OnboardingPrefs
 import com.secondbrain.lock.data.PendingOp
+import com.secondbrain.lock.data.SoundHapticsPrefs
 import com.secondbrain.lock.data.SyncQueue
 import com.secondbrain.lock.data.repo.StatsRepository
 import com.secondbrain.lock.data.repo.TasksRepository
@@ -131,6 +137,7 @@ fun FocusPomodoroDialog(
     }
     var state by remember { mutableStateOf(if (resume?.active == true) FocusUiState.RUNNING else FocusUiState.READY) }
     var isMicroSession by remember { mutableStateOf(false) }
+    var audioOn by remember { mutableStateOf(false) }
     var sessionId by remember { mutableStateOf(resume?.sessionId) }
     var endsAtMillis by remember { mutableLongStateOf(resume?.endsAtMillis ?: 0L) }
     var remainingMs by remember { mutableLongStateOf(0L) }
@@ -315,6 +322,7 @@ fun FocusPomodoroDialog(
                 }
             }
         }
+        FocusAudio.stop()
         onDismiss()
     }
 
@@ -420,23 +428,50 @@ fun FocusPomodoroDialog(
                             Text(error!!, color = Mist300, style = SecondBrainTypography.bodySmall)
                         }
                         Spacer(Modifier.height(28.dp))
-                        Button(
-                            onClick = { beginSession(minutes, micro = false, commitFirstThing = true) },
-                            enabled = !starting,
-                            colors = ButtonDefaults.buttonColors(containerColor = Violet400, contentColor = Ink950),
-                            modifier = Modifier.width(240.dp).height(56.dp)
-                        ) {
-                            if (starting) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Ink950, strokeWidth = 2.dp)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Starting…")
-                            } else {
-                                Text("Start")
-                            }
+                        // P20: "I can't get started" (onboarding screen 2) swaps which of these
+                        // two is the filled primary CTA — everyone else gets "Start" primary,
+                        // "Just 2 minutes" as the demoted text link, as before.
+                        val leadWithMicro = remember {
+                            OnboardingPrefs.PAIN_CANT_START in OnboardingPrefs.getPainPoints(context)
                         }
-                        Spacer(Modifier.height(8.dp))
-                        TextButton(onClick = { beginSession(2, micro = true, commitFirstThing = true) }, enabled = !starting) {
-                            Text("Just 2 minutes →", color = Mist100)
+                        if (leadWithMicro) {
+                            Button(
+                                onClick = { beginSession(2, micro = true, commitFirstThing = true) },
+                                enabled = !starting,
+                                colors = ButtonDefaults.buttonColors(containerColor = Violet400, contentColor = Ink950),
+                                modifier = Modifier.width(240.dp).height(56.dp)
+                            ) {
+                                if (starting) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Ink950, strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Starting…")
+                                } else {
+                                    Text("Just 2 minutes")
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(onClick = { beginSession(minutes, micro = false, commitFirstThing = true) }, enabled = !starting) {
+                                Text("Start $minutes min →", color = Mist100)
+                            }
+                        } else {
+                            Button(
+                                onClick = { beginSession(minutes, micro = false, commitFirstThing = true) },
+                                enabled = !starting,
+                                colors = ButtonDefaults.buttonColors(containerColor = Violet400, contentColor = Ink950),
+                                modifier = Modifier.width(240.dp).height(56.dp)
+                            ) {
+                                if (starting) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Ink950, strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Starting…")
+                                } else {
+                                    Text("Start")
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(onClick = { beginSession(2, micro = true, commitFirstThing = true) }, enabled = !starting) {
+                                Text("Just 2 minutes →", color = Mist100)
+                            }
                         }
                         TextButton(onClick = { stepsExpanded = !stepsExpanded }) {
                             Text(if (stepsExpanded) "Hide steps" else "Break it into steps →", color = Mist300)
@@ -512,6 +547,8 @@ fun FocusPomodoroDialog(
                                 val mode = if (isMicroSession) "micro" else "focus"
                                 logFocusActivity(minutes, mode)
                                 if (sessionId != null) scope.launch { ApiClient.postFocusState(false, null) }
+                                FocusAudio.stop()
+                                audioOn = false
                                 FocusSounds.complete()
                                 // Session-count bump happens once, in WorkScreen.handleCompletion("focus") — bumping it
                                 // here too would double-count it locally. Minutes aren't known there, so bump those here.
@@ -571,6 +608,7 @@ fun FocusPomodoroDialog(
                                         ApiClient.postFocusState(false, null)
                                     }
                                 }
+                                FocusAudio.stop()
                                 onDismiss()
                             },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Mist300)
@@ -614,6 +652,29 @@ fun FocusPomodoroDialog(
 
             IconButton(onClick = ::closeDialog, modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
                 Icon(Icons.Filled.Close, contentDescription = "Close", tint = Mist300)
+            }
+
+            // P19: only offered once actually running — silence during READY/MICRO_DONE would be
+            // a toggle with nothing to toggle.
+            if (state == FocusUiState.RUNNING) {
+                IconButton(
+                    onClick = {
+                        audioOn = !audioOn
+                        if (audioOn) {
+                            val preset = SoundHapticsPrefs.getFocusAudioPreset(context) ?: FocusAudioPreset.BROWN
+                            FocusAudio.start(context, preset)
+                        } else {
+                            FocusAudio.stop()
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                ) {
+                    Icon(
+                        if (audioOn) Icons.Filled.VolumeUp else Icons.Filled.VolumeOff,
+                        contentDescription = if (audioOn) "Turn off background sound" else "Turn on background sound",
+                        tint = Mist300
+                    )
+                }
             }
         }
     }

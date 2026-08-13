@@ -182,6 +182,21 @@ private fun RootApp(openCaptureTrigger: Int = 0) {
         return
     }
 
+    // P20: gated on GET /api/onboarding/status, fetched once per RootApp entry (i.e. once per
+    // login). Fails OPEN — a null/error status proceeds straight to the main app rather than
+    // blocking it, so a network hiccup here can never trap an existing user behind onboarding.
+    var onboardingStatus by remember { mutableStateOf<com.secondbrain.lock.network.dto.OnboardingStatus?>(null) }
+    LaunchedEffect(authToken) {
+        com.secondbrain.lock.data.repo.OnboardingRepository.refresh()
+        onboardingStatus = com.secondbrain.lock.data.repo.OnboardingRepository.status.value
+    }
+    if (onboardingStatus?.onboarded == false) {
+        com.secondbrain.lock.ui.screens.onboarding.WelcomeFlow(
+            onFinished = { onboardingStatus = onboardingStatus?.copy(onboarded = true) }
+        )
+        return
+    }
+
     val navController = rememberNavController()
     // Shared by the normal logout menu item and a successful account deactivation — both end
     // the session locally the same way.
