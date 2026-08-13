@@ -58,6 +58,54 @@ object FeedbackUtil {
         }
     }
 
+    /** P22: the double-thump, ascending — fires at the instant a task/routine/focus session is
+     * marked complete, timed to land ~200ms before the celebration text so the haptic itself
+     * reads as the reward, not just an acknowledgment. Never fired for a Shield lock triggering —
+     * that's a block, not an achievement, and haptically celebrating it would be bizarre. */
+    fun completionThump(context: Context) {
+        if (!SoundHapticsPrefs.isHapticsEnabled(context)) return
+        val vibrator = vibrator(context) ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            runCatching {
+                vibrator.vibrate(
+                    VibrationEffect.createWaveform(longArrayOf(0, 40, 60, 80), intArrayOf(0, 180, 0, 255), -1)
+                )
+            }
+        }
+    }
+
+    /** A fresh level being reached is a bigger deal than an ordinary completion — a longer,
+     * three-pulse ramp rather than the two-pulse [completionThump]. */
+    fun levelUpThump(context: Context) {
+        if (!SoundHapticsPrefs.isHapticsEnabled(context)) return
+        val vibrator = vibrator(context) ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            runCatching {
+                vibrator.vibrate(
+                    VibrationEffect.createWaveform(
+                        longArrayOf(0, 30, 50, 30, 50, 60),
+                        intArrayOf(0, 140, 0, 190, 0, 255),
+                        -1
+                    )
+                )
+            }
+        }
+    }
+
+    /** Two short ascending tones — the sound half of a completion, gated independently of the
+     * haptic so either channel can be turned off on its own. */
+    fun completionChime(context: Context) {
+        if (!SoundHapticsPrefs.isSoundsEnabled(context)) return
+        runCatching {
+            val tg = toneGenerator() ?: return@runCatching
+            tg.startTone(ToneGenerator.TONE_PROP_BEEP, 40)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                { runCatching { tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 40) } },
+                60
+            )
+        }
+    }
+
     /** Plays once a backgrounded request finishes successfully (e.g. the shield button's voice
      * capture being classified into a new task).
      *

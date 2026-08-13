@@ -25,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.secondbrain.lock.data.FeedbackUtil
+import com.secondbrain.lock.data.ThreeThingsPrefs
 import com.secondbrain.lock.data.WelcomeBackPrefs
 import com.secondbrain.lock.data.repo.MindQueueRepository
 import com.secondbrain.lock.data.repo.PlannerRepository
@@ -77,6 +79,7 @@ fun WorkScreen(
     // uses for its own FocusPomodoroDialog.
     var nowCardFocusTask by remember { mutableStateOf<com.secondbrain.lock.network.dto.Task?>(null) }
     val context = LocalContext.current
+    var threeThingsCount by remember { mutableStateOf(ThreeThingsPrefs.getCompletedToday(context)) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -108,13 +111,20 @@ fun WorkScreen(
         val nextTotal = prevTotal + 1
         val prevLevel = RewardMath.level(prevTotal)
         val nextLevel = RewardMath.level(nextTotal)
+        val leveledUp = nextLevel > prevLevel
         val dimLabel = if (type == "focus") "Focus" else "Follow-through"
         celebration = when {
-            nextLevel > prevLevel -> Celebration("Level up: $dimLabel Lv $nextLevel!", true)
+            leveledUp -> Celebration("Level up: $dimLabel Lv $nextLevel!", true)
             (0 until 100).random() < 15 -> Celebration(SURPRISE_LINES.random(), true)
             type == "task" -> Celebration(TASK_MESSAGES.random(), false)
             else -> Celebration(FOCUS_MESSAGES.random(), false)
         }
+        // P22: the haptic/tone land here, at the instant completion is registered — well before
+        // the celebration text appears a moment later — so the physical sensation is what reads
+        // as the reward, not just an acknowledgment.
+        if (leveledUp) FeedbackUtil.levelUpThump(context) else FeedbackUtil.completionThump(context)
+        FeedbackUtil.completionChime(context)
+        threeThingsCount = ThreeThingsPrefs.increment(context)
     }
 
     Box(Modifier.fullAuraBackground().fillMaxSize()) {
@@ -150,6 +160,8 @@ fun WorkScreen(
                 onOpenFocus = { task -> nowCardFocusTask = task },
                 onOpenRoutineFocus = { item -> nowCardFocusTask = com.secondbrain.lock.network.dto.Task(id = "", title = item.routine.title) }
             )
+            Spacer(Modifier.height(14.dp))
+            ThreeThingsRing(filled = threeThingsCount)
             Spacer(Modifier.height(16.dp))
             MorningBriefSection()
             Spacer(Modifier.height(16.dp))
