@@ -346,6 +346,23 @@ private fun ActiveSortCard(key: String, note: Note, onCommit: (SortTarget) -> Un
             }
         }
 
+        // Everything below is wrapped in ONE outer Column so it lays out as a single vertical
+        // flow inside the caller's Box — without this, the card and the four direction labels
+        // were direct siblings of that Box, which centers/overlays each of its children
+        // independently instead of stacking them, so "↑ Task" / the Archive-Project row /
+        // "↓ Resource" were literally rendering on top of each other and the card.
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // "↑ Task" sits above the card (swipe up), "↓ Resource" below (swipe down) — matching
+        // the up/down direction each actually commits, rather than both being stacked on the
+        // same side.
+        Text(
+            "↑ Task",
+            color = Mist300,
+            style = SecondBrainTypography.bodySmall,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().clickable(enabled = !committing) { exitTo(SortTarget.TASK) }
+        )
+        Spacer(Modifier.height(8.dp))
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -425,12 +442,19 @@ private fun ActiveSortCard(key: String, note: Note, onCommit: (SortTarget) -> Un
             Text("captured ${relativeTime(note.createdAt)}", color = Mist500, style = SecondBrainTypography.bodySmall)
         }
 
-        Spacer(Modifier.height(16.dp))
-        Text("↑ Task", color = Mist300, style = SecondBrainTypography.bodySmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().clickable(enabled = !committing) { exitTo(SortTarget.TASK) })
+        Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("← Archive", color = Mist300, style = SecondBrainTypography.bodySmall, modifier = Modifier.clickable(enabled = !committing) { exitTo(SortTarget.ARCHIVE) })
             Text("Project →", color = Mist300, style = SecondBrainTypography.bodySmall, modifier = Modifier.clickable(enabled = !committing) { exitTo(SortTarget.PROJECT) })
         }
-        Text("↓ Resource", color = Mist300, style = SecondBrainTypography.bodySmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().clickable(enabled = !committing) { exitTo(SortTarget.RESOURCE) })
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "↓ Resource",
+            color = Mist300,
+            style = SecondBrainTypography.bodySmall,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().clickable(enabled = !committing) { exitTo(SortTarget.RESOURCE) }
+        )
+        } // outer Column
     }
 }
